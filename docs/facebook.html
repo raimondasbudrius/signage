@@ -4,15 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Facebook naujienos – Molėtų progimnazija</title>
-    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        :root {
-            --fb-blue: #1877f2;
-            --fb-blue-light: #4d9fff;
-            --ink: #0a1424;
-        }
 
         html, body {
             width: 100vw;
@@ -21,351 +15,217 @@
         }
 
         body {
-            font-family: 'Manrope', sans-serif;
-            background: var(--ink);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #e8f0fe;
+            color: #1e293b;
+        }
+
+        /* ─── Header bar (matches tvarkarastis) ─── */
+        .header-bar {
+            background: linear-gradient(135deg, #1a73e8, #1557b0);
             color: white;
+            padding: 14px 28px;
+            border-radius: 12px;
+            margin: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            position: relative;
+            z-index: 50;
         }
 
-        /* ─── Ambient background ─── */
-        .bg-layer {
-            position: fixed;
-            inset: 0;
-            z-index: 0;
-            background:
-                radial-gradient(ellipse 80% 60% at 85% -10%, rgba(24,119,242,0.30) 0%, transparent 60%),
-                radial-gradient(ellipse 60% 50% at -10% 110%, rgba(24,119,242,0.18) 0%, transparent 55%),
-                linear-gradient(160deg, #0d1b30 0%, #0a1424 55%, #081020 100%);
+        .header-left h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 700;
         }
 
-        .bg-dots {
-            position: fixed;
-            inset: 0;
-            z-index: 0;
-            background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
-            background-size: 26px 26px;
-            mask-image: linear-gradient(180deg, transparent 0%, black 30%, black 70%, transparent 100%);
+        .header-left .subtitle {
+            font-size: 0.85rem;
+            opacity: 0.85;
+            margin-top: 3px;
         }
 
-        .bg-beam {
-            position: fixed;
-            top: -30%;
-            right: -10%;
-            width: 45vw;
-            height: 160vh;
-            z-index: 0;
-            background: linear-gradient(90deg, transparent, rgba(24,119,242,0.08), transparent);
-            transform: rotate(18deg);
-            animation: beamDrift 14s ease-in-out infinite alternate;
+        .header-right {
+            text-align: right;
         }
 
-        @keyframes beamDrift {
-            from { transform: rotate(18deg) translateX(0); opacity: 0.6; }
-            to   { transform: rotate(18deg) translateX(-8vw); opacity: 1; }
+        .clock-time {
+            font-size: 1.6rem;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
         }
 
-        /* ─── Full-bleed post image ─── */
-        .post-image-wrap {
-            position: fixed;
-            inset: 0;
-            z-index: 1;
+        .clock-date {
+            font-size: 0.85rem;
+            opacity: 0.85;
+            margin-top: 2px;
+            text-transform: capitalize;
+        }
+
+        /* ─── Slideshow area ─── */
+        .slideshow {
+            position: absolute;
+            top: 90px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
             overflow: hidden;
-            display: none;
         }
 
-        .post-image-wrap.visible { display: block; }
+        /* ─── Post card ─── */
+        .post-card {
+            position: absolute;
+            inset: 0;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .post-card.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ─── Post image ─── */
+        .post-image-area {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            background: #f0f4f8;
+            overflow: hidden;
+        }
+
+        .post-image-area.hidden { display: none; }
 
         .post-image {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scale(1.06);
-            animation: kenburns 30s ease-in-out infinite alternate;
             opacity: 0;
-            transition: opacity 1.2s ease;
+            transition: opacity 0.6s ease;
         }
 
         .post-image.loaded { opacity: 1; }
 
-        @keyframes kenburns {
-            from { transform: scale(1.06) translate(0, 0); }
-            to   { transform: scale(1.14) translate(-1.5%, -1%); }
-        }
-
-        .post-image-wrap::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(180deg,
-                rgba(8,16,32,0.65) 0%,
-                rgba(8,16,32,0.10) 30%,
-                rgba(8,16,32,0.20) 50%,
-                rgba(8,16,32,0.95) 100%);
-        }
-
-        /* Image counter chip (when post has multiple images) */
+        /* Image counter badge */
         .img-counter {
-            position: fixed;
-            top: 130px;
-            right: 44px;
-            z-index: 30;
-            display: none;
-            align-items: center;
-            gap: 8px;
-            background: rgba(8,16,32,0.7);
-            border: 1px solid rgba(255,255,255,0.15);
-            padding: 8px 16px;
-            border-radius: 100px;
-            font-family: 'Archivo', sans-serif;
-            font-size: 0.85rem;
-            font-weight: 700;
-            letter-spacing: 0.1em;
-            color: rgba(255,255,255,0.8);
-        }
-
-        .img-counter.visible { display: inline-flex; }
-
-        /* ─── Header ─── */
-        .top-bar {
-            position: fixed;
-            top: 0; left: 0; right: 0;
-            z-index: 50;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 28px 44px;
-            background: linear-gradient(180deg, rgba(8,16,32,0.92) 0%, rgba(8,16,32,0.55) 65%, transparent 100%);
-            pointer-events: none;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 18px;
-        }
-
-        .fb-badge {
-            width: 60px;
-            height: 60px;
-            border-radius: 16px;
-            background: linear-gradient(145deg, var(--fb-blue-light), var(--fb-blue));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Archivo Black', sans-serif;
-            font-size: 2.3rem;
-            box-shadow: 0 8px 28px rgba(24,119,242,0.5);
-            animation: badgePulse 4s ease-in-out infinite;
-        }
-
-        @keyframes badgePulse {
-            0%, 100% { box-shadow: 0 8px 28px rgba(24,119,242,0.5); }
-            50%      { box-shadow: 0 8px 42px rgba(24,119,242,0.8); }
-        }
-
-        .brand-text .kicker {
-            font-family: 'Archivo', sans-serif;
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(26, 115, 232, 0.9);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
             font-size: 0.8rem;
-            font-weight: 700;
-            letter-spacing: 0.3em;
-            text-transform: uppercase;
-            color: var(--fb-blue-light);
-        }
-
-        .brand-text .title {
-            font-family: 'Archivo Black', sans-serif;
-            font-size: 1.6rem;
-            letter-spacing: 0.01em;
-            margin-top: 2px;
-        }
-
-        .live-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 6px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            color: rgba(255,255,255,0.6);
-        }
-
-        .live-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #22c55e;
-            animation: liveBlink 1.6s ease-in-out infinite;
-        }
-
-        @keyframes liveBlink {
-            0%, 100% { opacity: 1; box-shadow: 0 0 10px rgba(34,197,94,0.9); }
-            50%      { opacity: 0.35; box-shadow: none; }
-        }
-
-        .clock-area { text-align: right; }
-
-        .clock-time {
-            font-family: 'Archivo Black', sans-serif;
-            font-size: 2.6rem;
-            font-variant-numeric: tabular-nums;
-            line-height: 1;
-        }
-
-        .clock-date {
-            font-size: 0.9rem;
             font-weight: 600;
-            color: rgba(255,255,255,0.55);
-            margin-top: 6px;
-            text-transform: capitalize;
+            display: none;
         }
 
-        /* ─── Post content ─── */
-        .post-content {
-            position: fixed;
-            left: 0; right: 0; bottom: 0;
-            z-index: 10;
-            padding: 0 64px 90px;
-            max-width: 1500px;
-            opacity: 0;
-            transform: translateY(40px);
-            transition: opacity 1s ease, transform 1s cubic-bezier(0.22, 1, 0.36, 1);
+        .img-counter.visible { display: block; }
+
+        /* ─── Post content area ─── */
+        .post-body {
+            padding: 24px 32px;
+            max-height: 45%;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #1a73e8 transparent;
         }
 
-        .post-content.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        .post-body::-webkit-scrollbar { width: 6px; }
+        .post-body::-webkit-scrollbar-track { background: transparent; }
+        .post-body::-webkit-scrollbar-thumb { background: #1a73e8; border-radius: 3px; }
 
         .post-meta {
             display: flex;
             align-items: center;
-            gap: 16px;
-            margin-bottom: 18px;
+            gap: 12px;
+            margin-bottom: 12px;
             flex-wrap: wrap;
         }
 
-        .post-date-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            background: rgba(24,119,242,0.95);
-            padding: 10px 22px;
-            border-radius: 100px;
-            font-family: 'Archivo', sans-serif;
-            font-size: 0.95rem;
-            font-weight: 800;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            box-shadow: 0 4px 20px rgba(24,119,242,0.4);
+        .post-date-badge {
+            display: inline-block;
+            background: #1a73e8;
+            color: white;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
         }
 
-        .post-number-chip {
-            display: inline-flex;
-            align-items: center;
-            background: rgba(255,255,255,0.12);
-            border: 1px solid rgba(255,255,255,0.2);
-            padding: 10px 18px;
-            border-radius: 100px;
-            font-family: 'Archivo', sans-serif;
-            font-size: 0.85rem;
-            font-weight: 700;
-            letter-spacing: 0.1em;
-            color: rgba(255,255,255,0.75);
+        .post-number-badge {
+            display: inline-block;
+            background: #e8f0fe;
+            color: #1a73e8;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border: 1px solid #1a73e8;
         }
 
         .post-title {
-            font-family: 'Archivo Black', sans-serif;
-            font-size: clamp(1.5rem, 3vw, 2.6rem);
-            line-height: 1.2;
-            text-shadow: 0 3px 24px rgba(0,0,0,0.8);
-            margin-bottom: 14px;
+            font-family: 'Archivo Black', 'Segoe UI', sans-serif;
+            font-size: clamp(1.3rem, 2.5vw, 2rem);
+            line-height: 1.25;
+            color: #1e293b;
+            margin-bottom: 10px;
         }
 
         .post-text {
-            font-size: clamp(1.1rem, 2.2vw, 1.9rem);
-            font-weight: 600;
-            line-height: 1.45;
-            color: rgba(255,255,255,0.92);
-            text-shadow: 0 2px 16px rgba(0,0,0,0.7);
-            max-height: 38vh;
-            overflow-y: auto;
-            padding-right: 12px;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(24,119,242,0.6) transparent;
+            font-size: clamp(1rem, 1.8vw, 1.4rem);
+            line-height: 1.5;
+            color: #475569;
         }
 
-        .post-text::-webkit-scrollbar { width: 6px; }
-        .post-text::-webkit-scrollbar-track { background: transparent; }
-        .post-text::-webkit-scrollbar-thumb { background: rgba(24,119,242,0.6); border-radius: 3px; }
+        /* Text-only post: centered layout */
+        .post-card.text-only .post-image-area { display: none; }
 
-        /* Text-only post: giant centered typography */
-        .post-textonly {
-            position: fixed;
-            inset: 0;
-            z-index: 10;
-            display: none;
+        .post-card.text-only .post-body {
+            max-height: 100%;
+            display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 140px 8vw 140px;
             text-align: center;
-            background: radial-gradient(ellipse 70% 55% at 50% 45%, rgba(24,119,242,0.16) 0%, transparent 70%);
-            opacity: 0;
-            transform: scale(0.97);
-            transition: opacity 1s ease, transform 1s cubic-bezier(0.22, 1, 0.36, 1);
+            padding: 48px 64px;
         }
 
-        .post-textonly.visible {
-            display: flex;
-            opacity: 1;
-            transform: scale(1);
-        }
-
-        .big-quote {
-            font-family: 'Archivo Black', sans-serif;
-            font-size: 8rem;
-            line-height: 0.5;
-            color: var(--fb-blue);
-            margin-bottom: 40px;
-            opacity: 0.9;
-            animation: quoteFloat 6s ease-in-out infinite alternate;
-        }
-
-        @keyframes quoteFloat {
-            from { transform: translateY(0); }
-            to   { transform: translateY(-12px); }
-        }
-
-        .post-textonly .post-title {
-            font-size: clamp(1.6rem, 3.4vw, 3rem);
-            max-width: 80%;
-            margin: 0 auto 20px;
-        }
-
-        .post-textonly .post-text {
-            font-size: clamp(1.2rem, 2.4vw, 2rem);
-            max-height: 40vh;
-            overflow-y: auto;
-            max-width: 80%;
-            margin: 0 auto;
-        }
-
-        .post-textonly .post-meta {
+        .post-card.text-only .post-meta {
             justify-content: center;
-            margin-top: 36px;
+            order: 3;
+            margin-top: 24px;
             margin-bottom: 0;
+        }
+
+        .post-card.text-only .post-title {
+            font-size: clamp(1.5rem, 3vw, 2.6rem);
+            max-width: 80%;
+        }
+
+        .post-card.text-only .post-text {
+            font-size: clamp(1.1rem, 2vw, 1.6rem);
+            max-width: 70%;
         }
 
         /* ─── Post progress dots ─── */
         .post-dots {
-            position: fixed;
-            bottom: 32px;
+            position: absolute;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 45;
             display: flex;
-            gap: 10px;
+            gap: 8px;
             align-items: center;
         }
 
@@ -373,63 +233,61 @@
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            background: rgba(255,255,255,0.25);
+            background: #cbd5e1;
             transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .post-dot.active {
-            width: 32px;
+            width: 28px;
             border-radius: 5px;
-            background: var(--fb-blue);
-            box-shadow: 0 0 12px rgba(24,119,242,0.7);
+            background: #1a73e8;
+            box-shadow: 0 0 8px rgba(26, 115, 232, 0.5);
         }
 
         /* ─── Footer ─── */
-        .bottom-bar {
-            position: fixed;
-            left: 0; right: 0; bottom: 0;
-            z-index: 40;
-            padding: 0 44px 24px;
+        .footer-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 8px 28px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            background: linear-gradient(0deg, rgba(8,16,32,0.85) 0%, transparent 100%);
+            justify-content: flex-end;
             pointer-events: none;
+            z-index: 40;
         }
 
         .page-handle {
-            font-family: 'Archivo', sans-serif;
-            font-size: 0.95rem;
-            font-weight: 700;
-            color: rgba(255,255,255,0.55);
-            letter-spacing: 0.06em;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #64748b;
         }
 
         /* ─── Embed mode: hide header when embedded in index.html ─── */
-        body.embed .top-bar { display: none; }
-        body.embed .img-counter { top: 24px; }
-        body.embed .post-content { padding-top: 24px; }
+        body.embed .header-bar { display: none; }
+        body.embed .slideshow { top: 10px; }
 
         /* ─── Loading / error states ─── */
         .state-screen {
-            position: fixed;
+            position: absolute;
             inset: 0;
             z-index: 100;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: var(--ink);
+            background: #e8f0fe;
             transition: opacity 0.6s;
         }
 
         .state-screen.hidden { opacity: 0; pointer-events: none; }
 
         .loader-ring {
-            width: 72px;
-            height: 72px;
-            border: 5px solid rgba(24,119,242,0.2);
-            border-top-color: var(--fb-blue);
+            width: 56px;
+            height: 56px;
+            border: 5px solid #cbd5e1;
+            border-top-color: #1a73e8;
             border-radius: 50%;
             animation: spin 0.9s linear infinite;
         }
@@ -437,82 +295,49 @@
         @keyframes spin { to { transform: rotate(360deg); } }
 
         .state-msg {
-            margin-top: 30px;
-            font-family: 'Archivo', sans-serif;
+            margin-top: 24px;
             font-weight: 700;
-            font-size: 1.2rem;
-            color: rgba(255,255,255,0.75);
+            font-size: 1.1rem;
+            color: #1e293b;
         }
 
         .state-sub {
-            margin-top: 12px;
+            margin-top: 10px;
             font-size: 0.9rem;
-            color: rgba(255,255,255,0.4);
+            color: #64748b;
         }
 
         .retry-note {
-            margin-top: 24px;
+            margin-top: 20px;
             font-size: 0.8rem;
-            color: rgba(255,255,255,0.3);
+            color: #94a3b8;
         }
     </style>
 </head>
 <body>
 
-    <div class="bg-layer"></div>
-    <div class="bg-dots"></div>
-    <div class="bg-beam"></div>
-
-    <!-- Full-bleed post image -->
-    <div class="post-image-wrap" id="postImageWrap">
-        <img class="post-image" id="postImage" src="" alt="">
-    </div>
-
-    <!-- Image counter -->
-    <div class="img-counter" id="imgCounter">🖼 1 / 3</div>
-
     <!-- Header -->
-    <div class="top-bar">
-        <div class="brand">
-            <div class="fb-badge">f</div>
-            <div class="brand-text">
-                <div class="kicker">Molėtų progimnazija</div>
-                <div class="title">Naujienos iš Facebook</div>
-                <div class="live-chip"><span class="live-dot"></span> Paskutiniai įrašai</div>
-            </div>
+    <div class="header-bar">
+        <div class="header-left">
+            <h2>Molėtų progimnazijos naujienos</h2>
+            <div class="subtitle">Paskutiniai įrašai iš Facebook</div>
         </div>
-        <div class="clock-area">
+        <div class="header-right">
             <div class="clock-time" id="clockTime">--:--</div>
             <div class="clock-date" id="clockDate"></div>
         </div>
     </div>
 
-    <!-- Post: image layout -->
-    <div class="post-content" id="postContent">
-        <div class="post-meta">
-            <span class="post-date-chip" id="postDate">📅 —</span>
-            <span class="post-number-chip" id="postNumber">Įrašas 1 / 5</span>
-        </div>
-        <div class="post-title" id="postTitle"></div>
-        <div class="post-text" id="postText"></div>
-    </div>
-
-    <!-- Post: text-only layout -->
-    <div class="post-textonly" id="postTextOnly">
-        <div class="big-quote">“</div>
-        <div class="post-title" id="postTitleBig"></div>
-        <div class="post-text" id="postTextBig"></div>
-        <div class="post-meta">
-            <span class="post-date-chip" id="postDateTextOnly">📅 —</span>
-            <span class="post-number-chip" id="postNumberTextOnly">Įrašas 1 / 5</span>
-        </div>
+    <!-- Slideshow -->
+    <div class="slideshow" id="slideshow">
+        <!-- Post cards injected here -->
     </div>
 
     <!-- Post dots -->
     <div class="post-dots" id="postDots"></div>
 
     <!-- Footer -->
-    <div class="bottom-bar">
+    <div class="footer-bar">
         <div class="page-handle" id="pageHandle">facebook.com/Mokykla.Moletai</div>
     </div>
 
@@ -532,11 +357,10 @@
     const params = new URLSearchParams(window.location.search);
     const PAGE_ID = params.get('page') || 'Mokykla.Moletai';
     const POST_LIMIT = Math.min(parseInt(params.get('limit')) || 5, 10);
-    const POST_DELAY = (parseInt(params.get('delay')) || 15) * 1000; // seconds per post
-    const IMAGE_DELAY = 5000; // ms per image within a post
+    const POST_DELAY = (parseInt(params.get('delay')) || 15) * 1000;
+    const IMAGE_DELAY = 5000;
     const EMBED_MODE = params.get('embed') === '1';
 
-    // Hide header when embedded (index.html shows its own header)
     if (EMBED_MODE) {
         document.body.classList.add('embed');
     }
@@ -581,7 +405,6 @@
     }
 
     async function fetchFeed() {
-        // Try direct fetch first
         try {
             document.getElementById('loadingSub').textContent = 'Bandoma tiesiogiai…';
             const doc = await fetchXmlWithTimeout(RSS_FEED_URL, 10000);
@@ -590,7 +413,6 @@
             console.warn('Direct fetch failed:', e.message);
         }
 
-        // Try through CORS proxies
         for (const proxy of CORS_PROXIES) {
             try {
                 const proxyUrl = proxy(RSS_FEED_URL);
@@ -611,40 +433,33 @@
 
     // ─── Parse RSS items ───
     function parseItem(item) {
-        // Title
         const titleEl = item.querySelector('title');
         let title = titleEl ? titleEl.textContent.trim() : '';
-        // Remove trailing "..." truncation artifacts and "Posted" suffix
         title = title.replace(/\.\.\.$/, '').replace(/\s+Posted$/, '').trim();
 
-        // Description HTML
         const descEl = item.querySelector('description');
         const descHtml = descEl ? descEl.textContent : '';
 
-        // Extract text from description (strip HTML, keep line breaks)
         let text = '';
         if (descHtml) {
             const tmp = document.createElement('div');
             tmp.innerHTML = descHtml;
-            // Convert <br> to newlines before extracting text
             tmp.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
             text = tmp.textContent || '';
         }
-        // If description is empty or same as title, use title as text
         if (!text.trim() || text.trim() === title) {
             text = '';
         }
         text = text.replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n').trim();
 
-        // Collect ALL images: from <img> in description + media:content
         const images = [];
         const seen = new Set();
 
         function addImage(url) {
             if (!url) return;
-            // Decode HTML entities
-            const decoded = url.replace(/&/g, '&');
-            // Normalize for dedup (ignore size params)
+            // Decode HTML entity for ampersand (built via char codes to stay robust)
+            const ampEntity = String.fromCharCode(38) + 'amp;';
+            const decoded = url.split(ampEntity).join(String.fromCharCode(38));
             const key = decoded.split('?')[0];
             if (!seen.has(key)) {
                 seen.add(key);
@@ -652,27 +467,23 @@
             }
         }
 
-        // From <img> tags in description
         if (descHtml) {
             const tmp = document.createElement('div');
             tmp.innerHTML = descHtml;
             tmp.querySelectorAll('img').forEach(img => addImage(img.getAttribute('src')));
         }
 
-        // From media:content elements
         Array.from(item.getElementsByTagName('media:content')).forEach(mc => {
             if (mc.getAttribute('medium') === 'image' || !mc.getAttribute('medium')) {
                 addImage(mc.getAttribute('url'));
             }
         });
 
-        // From enclosure
         const enclosure = item.querySelector('enclosure');
         if (enclosure && (enclosure.getAttribute('type') || '').startsWith('image/')) {
             addImage(enclosure.getAttribute('url'));
         }
 
-        // Date
         const pubDateEl = item.querySelector('pubDate');
         const date = pubDateEl ? new Date(pubDateEl.textContent) : null;
 
@@ -697,6 +508,39 @@
     let postTimer = null;
     let imageTimer = null;
     let scrollAnim = null;
+    let postCards = [];
+
+    function buildPostCards() {
+        const container = document.getElementById('slideshow');
+        container.innerHTML = '';
+        postCards = [];
+
+        posts.forEach((post, index) => {
+            const card = document.createElement('div');
+            card.className = 'post-card' + (post.images.length === 0 ? ' text-only' : '');
+
+            const dateStr = formatDate(post.date);
+            const numStr = 'Įrašas ' + (index + 1) + ' / ' + posts.length;
+
+            card.innerHTML = `
+                <div class="post-image-area">
+                    <img class="post-image" src="" alt="">
+                    <div class="img-counter"></div>
+                </div>
+                <div class="post-body">
+                    <div class="post-meta">
+                        <span class="post-date-badge">${escapeHtml(dateStr)}</span>
+                        <span class="post-number-badge">${escapeHtml(numStr)}</span>
+                    </div>
+                    <div class="post-title">${escapeHtml(post.title)}</div>
+                    <div class="post-text">${post.text ? escapeHtml(post.text).replace(/\n/g, '<br>') : ''}</div>
+                </div>
+            `;
+
+            container.appendChild(card);
+            postCards.push(card);
+        });
+    }
 
     function buildDots() {
         const container = document.getElementById('postDots');
@@ -714,7 +558,6 @@
         });
     }
 
-    // Auto-scroll long text
     function autoScrollText(el) {
         if (scrollAnim) cancelAnimationFrame(scrollAnim);
         if (!el) return;
@@ -740,80 +583,57 @@
         }, 600);
     }
 
-    function showImage(post, index) {
+    function showImage(post, card, index) {
         currentImage = index;
-        const img = document.getElementById('postImage');
-        const counter = document.getElementById('imgCounter');
+        const img = card.querySelector('.post-image');
+        const counter = card.querySelector('.img-counter');
+        const imageArea = card.querySelector('.post-image-area');
 
         img.classList.remove('loaded');
         img.onload = () => img.classList.add('loaded');
         img.onerror = () => {
-            // Skip broken image
             if (post.images.length > 1) {
                 post.images.splice(index, 1);
                 if (currentImage >= post.images.length) currentImage = 0;
-                showImage(post, currentImage);
+                showImage(post, card, currentImage);
             } else {
-                document.getElementById('postImageWrap').classList.remove('visible');
+                imageArea.classList.add('hidden');
                 counter.classList.remove('visible');
             }
         };
         img.src = post.images[index];
-        document.getElementById('postImageWrap').classList.add('visible');
 
         if (post.images.length > 1) {
-            counter.textContent = '🖼 ' + (index + 1) + ' / ' + post.images.length;
+            counter.textContent = (index + 1) + ' / ' + post.images.length;
             counter.classList.add('visible');
         } else {
             counter.classList.remove('visible');
         }
     }
 
-    function renderPost(post, index) {
-        const dateStr = '📅 ' + formatDate(post.date);
-        const numStr = 'Įrašas ' + (index + 1) + ' / ' + posts.length;
-        const hasImages = post.images.length > 0;
-        const hasText = post.text.length > 0;
+    function renderPost(index) {
+        const post = posts[index];
+        const card = postCards[index];
 
-        // Hide both layouts first
-        document.getElementById('postContent').classList.remove('visible');
-        document.getElementById('postTextOnly').classList.remove('visible');
-        if (!hasImages) {
-            document.getElementById('postImageWrap').classList.remove('visible');
-            document.getElementById('imgCounter').classList.remove('visible');
-        }
+        // Hide all cards
+        postCards.forEach(c => c.classList.remove('active'));
 
-        if (hasImages) {
-            // Image layout
-            showImage(post, 0);
-            document.getElementById('postDate').textContent = dateStr;
-            document.getElementById('postNumber').textContent = numStr;
-            document.getElementById('postTitle').innerHTML = escapeHtml(post.title);
-            document.getElementById('postText').innerHTML = hasText ? escapeHtml(post.text).replace(/\n/g, '<br>') : '';
-            document.getElementById('postText').style.display = hasText ? '' : 'none';
+        // Show current card
+        card.classList.add('active');
 
-            setTimeout(() => {
-                document.getElementById('postContent').classList.add('visible');
-                autoScrollText(document.getElementById('postText'));
-            }, 250);
+        if (post.images.length > 0) {
+            showImage(post, card, 0);
 
-            // Cycle images within post
             clearInterval(imageTimer);
             if (post.images.length > 1) {
                 imageTimer = setInterval(() => {
-                    showImage(post, (currentImage + 1) % post.images.length);
+                    showImage(post, card, (currentImage + 1) % post.images.length);
                 }, IMAGE_DELAY);
             }
-        } else {
-            // Text-only layout
-            document.getElementById('postDateTextOnly').textContent = dateStr;
-            document.getElementById('postNumberTextOnly').textContent = numStr;
-            document.getElementById('postTitleBig').innerHTML = escapeHtml(post.title);
-            document.getElementById('postTextBig').innerHTML = hasText ? escapeHtml(post.text).replace(/\n/g, '<br>') : '';
-            document.getElementById('postTextBig').style.display = hasText ? '' : 'none';
-            document.getElementById('postTextOnly').classList.add('visible');
-            autoScrollText(document.getElementById('postTextBig'));
         }
+
+        const textEl = card.querySelector('.post-text');
+        autoScrollText(textEl);
 
         updateDots();
         document.getElementById('loadingScreen').classList.add('hidden');
@@ -821,24 +641,23 @@
 
     function advancePost() {
         currentPost = (currentPost + 1) % posts.length;
-        renderPost(posts[currentPost], currentPost);
+        renderPost(currentPost);
     }
 
     function startSlideshow() {
+        buildPostCards();
         buildDots();
         advancePost();
         clearTimeout(postTimer);
         postTimer = setInterval(advancePost, POST_DELAY);
     }
 
-    // ─── Error state with auto-retry ───
     function showError() {
         document.getElementById('loadingSub').textContent = 'Nepavyko gauti įrašų';
         document.querySelector('.retry-note').textContent = 'Bandoma dar kartą po 60 sekundžių…';
         setTimeout(init, 60000);
     }
 
-    // ─── Init ───
     async function init() {
         const doc = await fetchFeed();
 
@@ -855,8 +674,7 @@
             return;
         }
 
-        // Restart slideshow only on first load or if post count changed
-        if (currentPost === -1 || posts.length !== document.querySelectorAll('.post-dot').length) {
+        if (currentPost === -1 || posts.length !== postCards.length) {
             clearInterval(postTimer);
             clearInterval(imageTimer);
             currentPost = -1;
@@ -866,7 +684,6 @@
 
     init();
 
-    // Refresh feed every 5 minutes
     setInterval(init, 5 * 60 * 1000);
 })();
 </script>
