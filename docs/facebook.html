@@ -80,7 +80,11 @@
             object-fit: cover;
             transform: scale(1.06);
             animation: kenburns 30s ease-in-out infinite alternate;
+            opacity: 0;
+            transition: opacity 1.2s ease;
         }
+
+        .post-image.loaded { opacity: 1; }
 
         @keyframes kenburns {
             from { transform: scale(1.06) translate(0, 0); }
@@ -97,6 +101,28 @@
                 rgba(8,16,32,0.20) 50%,
                 rgba(8,16,32,0.95) 100%);
         }
+
+        /* Image counter chip (when post has multiple images) */
+        .img-counter {
+            position: fixed;
+            top: 130px;
+            right: 44px;
+            z-index: 30;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            background: rgba(8,16,32,0.7);
+            border: 1px solid rgba(255,255,255,0.15);
+            padding: 8px 16px;
+            border-radius: 100px;
+            font-family: 'Archivo', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .img-counter.visible { display: inline-flex; }
 
         /* ─── Header ─── */
         .top-bar {
@@ -194,15 +220,13 @@
             text-transform: capitalize;
         }
 
-        /* ─── Single post content ─── */
+        /* ─── Post content ─── */
         .post-content {
             position: fixed;
             left: 0; right: 0; bottom: 0;
             z-index: 10;
-            padding: 0 64px 72px;
-            max-width: 1400px;
-            max-height: 75vh;
-            overflow-y: auto;
+            padding: 0 64px 90px;
+            max-width: 1500px;
             opacity: 0;
             transform: translateY(40px);
             transition: opacity 1s ease, transform 1s cubic-bezier(0.22, 1, 0.36, 1);
@@ -217,7 +241,8 @@
             display: flex;
             align-items: center;
             gap: 16px;
-            margin-bottom: 24px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
         }
 
         .post-date-chip {
@@ -235,22 +260,44 @@
             box-shadow: 0 4px 20px rgba(24,119,242,0.4);
         }
 
-        .post-label {
+        .post-number-chip {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 10px 18px;
+            border-radius: 100px;
+            font-family: 'Archivo', sans-serif;
             font-size: 0.85rem;
             font-weight: 700;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-            color: rgba(255,255,255,0.5);
+            letter-spacing: 0.1em;
+            color: rgba(255,255,255,0.75);
+        }
+
+        .post-title {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: clamp(1.5rem, 3vw, 2.6rem);
+            line-height: 1.2;
+            text-shadow: 0 3px 24px rgba(0,0,0,0.8);
+            margin-bottom: 14px;
         }
 
         .post-text {
-            font-size: clamp(1.4rem, 2.8vw, 2.6rem);
-            font-weight: 800;
-            line-height: 1.35;
-            text-shadow: 0 3px 24px rgba(0,0,0,0.7);
-            max-height: 60vh;
+            font-size: clamp(1.1rem, 2.2vw, 1.9rem);
+            font-weight: 600;
+            line-height: 1.45;
+            color: rgba(255,255,255,0.92);
+            text-shadow: 0 2px 16px rgba(0,0,0,0.7);
+            max-height: 38vh;
             overflow-y: auto;
+            padding-right: 12px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(24,119,242,0.6) transparent;
         }
+
+        .post-text::-webkit-scrollbar { width: 6px; }
+        .post-text::-webkit-scrollbar-track { background: transparent; }
+        .post-text::-webkit-scrollbar-thumb { background: rgba(24,119,242,0.6); border-radius: 3px; }
 
         /* Text-only post: giant centered typography */
         .post-textonly {
@@ -261,7 +308,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 140px 10vw 120px;
+            padding: 140px 8vw 140px;
             text-align: center;
             background: radial-gradient(ellipse 70% 55% at 50% 45%, rgba(24,119,242,0.16) 0%, transparent 70%);
             opacity: 0;
@@ -277,10 +324,10 @@
 
         .big-quote {
             font-family: 'Archivo Black', sans-serif;
-            font-size: 9rem;
+            font-size: 8rem;
             line-height: 0.5;
             color: var(--fb-blue);
-            margin-bottom: 48px;
+            margin-bottom: 40px;
             opacity: 0.9;
             animation: quoteFloat 6s ease-in-out infinite alternate;
         }
@@ -290,16 +337,51 @@
             to   { transform: translateY(-12px); }
         }
 
+        .post-textonly .post-title {
+            font-size: clamp(1.6rem, 3.4vw, 3rem);
+            max-width: 80%;
+            margin: 0 auto 20px;
+        }
+
         .post-textonly .post-text {
-            font-size: clamp(1.6rem, 3.2vw, 3rem);
-            max-height: 55vh;
+            font-size: clamp(1.2rem, 2.4vw, 2rem);
+            max-height: 40vh;
             overflow-y: auto;
+            max-width: 80%;
+            margin: 0 auto;
         }
 
         .post-textonly .post-meta {
             justify-content: center;
-            margin-top: 44px;
+            margin-top: 36px;
             margin-bottom: 0;
+        }
+
+        /* ─── Post progress dots ─── */
+        .post-dots {
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 45;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .post-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.25);
+            transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .post-dot.active {
+            width: 32px;
+            border-radius: 5px;
+            background: var(--fb-blue);
+            box-shadow: 0 0 12px rgba(24,119,242,0.7);
         }
 
         /* ─── Footer ─── */
@@ -310,7 +392,7 @@
             padding: 0 44px 24px;
             display: flex;
             align-items: center;
-            justify-content: flex-end;
+            justify-content: space-between;
             background: linear-gradient(0deg, rgba(8,16,32,0.85) 0%, transparent 100%);
             pointer-events: none;
         }
@@ -381,6 +463,9 @@
         <img class="post-image" id="postImage" src="" alt="">
     </div>
 
+    <!-- Image counter -->
+    <div class="img-counter" id="imgCounter">🖼 1 / 3</div>
+
     <!-- Header -->
     <div class="top-bar">
         <div class="brand">
@@ -388,7 +473,7 @@
             <div class="brand-text">
                 <div class="kicker">Molėtų progimnazija</div>
                 <div class="title">Naujienos iš Facebook</div>
-                <div class="live-chip"><span class="live-dot"></span> Naujausias įrašas</div>
+                <div class="live-chip"><span class="live-dot"></span> Paskutiniai įrašai</div>
             </div>
         </div>
         <div class="clock-area">
@@ -397,23 +482,29 @@
         </div>
     </div>
 
-    <!-- Single post: image layout -->
+    <!-- Post: image layout -->
     <div class="post-content" id="postContent">
         <div class="post-meta">
             <span class="post-date-chip" id="postDate">📅 —</span>
-            <span class="post-label">Naujausias įrašas</span>
+            <span class="post-number-chip" id="postNumber">Įrašas 1 / 5</span>
         </div>
+        <div class="post-title" id="postTitle"></div>
         <div class="post-text" id="postText"></div>
     </div>
 
-    <!-- Single post: text-only layout -->
+    <!-- Post: text-only layout -->
     <div class="post-textonly" id="postTextOnly">
         <div class="big-quote">“</div>
+        <div class="post-title" id="postTitleBig"></div>
         <div class="post-text" id="postTextBig"></div>
         <div class="post-meta">
             <span class="post-date-chip" id="postDateTextOnly">📅 —</span>
+            <span class="post-number-chip" id="postNumberTextOnly">Įrašas 1 / 5</span>
         </div>
     </div>
+
+    <!-- Post dots -->
+    <div class="post-dots" id="postDots"></div>
 
     <!-- Footer -->
     <div class="bottom-bar">
@@ -423,7 +514,7 @@
     <!-- Loading -->
     <div class="state-screen" id="loadingScreen">
         <div class="loader-ring"></div>
-        <div class="state-msg">Kraunamas naujausias įrašas…</div>
+        <div class="state-msg">Kraunami naujausi įrašai…</div>
         <div class="state-sub" id="loadingSub">Jungiamasi prie naujienų šaltinio</div>
         <div class="retry-note">Bandoma gauti įrašus iš Facebook</div>
     </div>
@@ -435,6 +526,9 @@
     // ─── Config from URL params ───
     const params = new URLSearchParams(window.location.search);
     const PAGE_ID = params.get('page') || 'Mokykla.Moletai';
+    const POST_LIMIT = Math.min(parseInt(params.get('limit')) || 5, 10);
+    const POST_DELAY = (parseInt(params.get('delay')) || 15) * 1000; // seconds per post
+    const IMAGE_DELAY = 5000; // ms per image within a post
 
     document.getElementById('pageHandle').textContent = 'facebook.com/' + PAGE_ID;
 
@@ -456,7 +550,6 @@
     // ─── RSS feed from rss.app ───
     const RSS_FEED_URL = 'https://rss.app/feeds/X0EQ2Ue9pn0SEwIs.xml';
 
-    // CORS proxies to bypass browser restrictions on GitHub Pages
     const CORS_PROXIES = [
         url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
         url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
@@ -476,13 +569,12 @@
         }
     }
 
-    async function fetchLatestPost() {
+    async function fetchFeed() {
         // Try direct fetch first
         try {
             document.getElementById('loadingSub').textContent = 'Bandoma tiesiogiai…';
             const doc = await fetchXmlWithTimeout(RSS_FEED_URL, 10000);
-            const item = doc.querySelector('item');
-            if (item) return item;
+            if (doc.querySelector('item')) return doc;
         } catch (e) {
             console.warn('Direct fetch failed:', e.message);
         }
@@ -494,15 +586,10 @@
                 const proxyHost = proxyUrl.split('://')[1]?.split('/')[0] || 'proxy';
                 document.getElementById('loadingSub').textContent = 'Bandoma: ' + proxyHost;
                 const doc = await fetchXmlWithTimeout(proxyUrl, 12000);
-                
-                // Check for parse errors
-                const parseError = doc.querySelector('parsererror');
-                if (parseError) throw new Error('XML parse error');
-                
-                const item = doc.querySelector('item');
-                if (item) {
+                if (doc.querySelector('parsererror')) throw new Error('XML parse error');
+                if (doc.querySelector('item')) {
                     console.log('Success via proxy:', proxyHost);
-                    return item;
+                    return doc;
                 }
             } catch (e) {
                 console.warn('Proxy failed:', e.message);
@@ -511,54 +598,74 @@
         return null;
     }
 
-    // ─── Parse RSS item ───
+    // ─── Parse RSS items ───
     function parseItem(item) {
-        // Get text from description or title
-        let text = '';
+        // Title
+        const titleEl = item.querySelector('title');
+        let title = titleEl ? titleEl.textContent.trim() : '';
+        // Remove trailing "..." truncation artifacts and "Posted" suffix
+        title = title.replace(/\.\.\.$/, '').replace(/\s+Posted$/, '').trim();
+
+        // Description HTML
         const descEl = item.querySelector('description');
-        if (descEl && descEl.textContent) {
-            // Strip HTML tags from description
+        const descHtml = descEl ? descEl.textContent : '';
+
+        // Extract text from description (strip HTML, keep line breaks)
+        let text = '';
+        if (descHtml) {
             const tmp = document.createElement('div');
-            tmp.innerHTML = descEl.textContent;
+            tmp.innerHTML = descHtml;
+            // Convert <br> to newlines before extracting text
+            tmp.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
             text = tmp.textContent || '';
         }
-        if (!text) {
-            const titleEl = item.querySelector('title');
-            text = titleEl ? titleEl.textContent : 'Naujausias įrašas';
+        // If description is empty or same as title, use title as text
+        if (!text.trim() || text.trim() === title) {
+            text = '';
         }
-        text = text.replace(/\s+/g, ' ').trim();
+        text = text.replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n').trim();
 
-        // Image: from enclosure, media:content, or first <img> in description
-        let image = null;
-        
-        // Try enclosure element
-        const enclosure = item.querySelector('enclosure');
-        if (enclosure && enclosure.getAttribute('type')?.startsWith('image/')) {
-            image = enclosure.getAttribute('url');
-        }
-        
-        // Try media:content or media:thumbnail
-        if (!image) {
-            const mediaContent = item.getElementsByTagName('media:content')[0] || 
-                               item.getElementsByTagName('media:thumbnail')[0];
-            if (mediaContent) {
-                image = mediaContent.getAttribute('url');
+        // Collect ALL images: from <img> in description + media:content
+        const images = [];
+        const seen = new Set();
+
+        function addImage(url) {
+            if (!url) return;
+            // Decode HTML entities
+            const decoded = url.replace(/&/g, '&');
+            // Normalize for dedup (ignore size params)
+            const key = decoded.split('?')[0];
+            if (!seen.has(key)) {
+                seen.add(key);
+                images.push(decoded);
             }
         }
-        
-        // Try first <img> in description
-        if (!image && descEl && descEl.textContent) {
+
+        // From <img> tags in description
+        if (descHtml) {
             const tmp = document.createElement('div');
-            tmp.innerHTML = descEl.textContent;
-            const imgEl = tmp.querySelector('img');
-            if (imgEl) image = imgEl.src;
+            tmp.innerHTML = descHtml;
+            tmp.querySelectorAll('img').forEach(img => addImage(img.getAttribute('src')));
         }
 
-        // Date from pubDate
+        // From media:content elements
+        Array.from(item.getElementsByTagName('media:content')).forEach(mc => {
+            if (mc.getAttribute('medium') === 'image' || !mc.getAttribute('medium')) {
+                addImage(mc.getAttribute('url'));
+            }
+        });
+
+        // From enclosure
+        const enclosure = item.querySelector('enclosure');
+        if (enclosure && (enclosure.getAttribute('type') || '').startsWith('image/')) {
+            addImage(enclosure.getAttribute('url'));
+        }
+
+        // Date
         const pubDateEl = item.querySelector('pubDate');
         const date = pubDateEl ? new Date(pubDateEl.textContent) : null;
 
-        return { text, image, date };
+        return { title, text, images, date };
     }
 
     function escapeHtml(str) {
@@ -572,89 +679,145 @@
         return MONTH_SHORT[d.getMonth()] + ' ' + d.getDate() + ' d.';
     }
 
-    // ─── Render single post full-screen ───
-    function renderPost(post) {
-        const dateStr = '📅 ' + formatDate(post.date);
+    // ─── Slideshow state ───
+    let posts = [];
+    let currentPost = -1;
+    let currentImage = 0;
+    let postTimer = null;
+    let imageTimer = null;
+    let scrollAnim = null;
 
-        if (post.image) {
-            // Image layout: full-bleed background + text overlay
-            const img = document.getElementById('postImage');
-            img.onerror = function() {
-                // Fall back to text-only layout if image fails
+    function buildDots() {
+        const container = document.getElementById('postDots');
+        container.innerHTML = '';
+        posts.forEach((_, i) => {
+            const dot = document.createElement('div');
+            dot.className = 'post-dot';
+            container.appendChild(dot);
+        });
+    }
+
+    function updateDots() {
+        document.querySelectorAll('.post-dot').forEach((dot, i) => {
+            dot.classList.toggle('active', i === currentPost);
+        });
+    }
+
+    // Auto-scroll long text
+    function autoScrollText(el) {
+        if (scrollAnim) cancelAnimationFrame(scrollAnim);
+        if (!el) return;
+        el.scrollTop = 0;
+
+        setTimeout(() => {
+            if (el.scrollHeight > el.clientHeight + 10) {
+                let pos = 0;
+                let dir = 1;
+                let pause = 100;
+
+                function step() {
+                    if (pause > 0) { pause--; scrollAnim = requestAnimationFrame(step); return; }
+                    pos += dir;
+                    const max = el.scrollHeight - el.clientHeight;
+                    if (pos >= max) { pos = max; dir = -1; pause = 140; }
+                    if (pos <= 0) { pos = 0; dir = 1; pause = 140; }
+                    el.scrollTop = pos;
+                    scrollAnim = requestAnimationFrame(step);
+                }
+                scrollAnim = requestAnimationFrame(step);
+            }
+        }, 600);
+    }
+
+    function showImage(post, index) {
+        currentImage = index;
+        const img = document.getElementById('postImage');
+        const counter = document.getElementById('imgCounter');
+
+        img.classList.remove('loaded');
+        img.onload = () => img.classList.add('loaded');
+        img.onerror = () => {
+            // Skip broken image
+            if (post.images.length > 1) {
+                post.images.splice(index, 1);
+                if (currentImage >= post.images.length) currentImage = 0;
+                showImage(post, currentImage);
+            } else {
                 document.getElementById('postImageWrap').classList.remove('visible');
-                document.getElementById('postContent').classList.remove('visible');
-                renderTextOnly(post, dateStr);
-            };
-            img.src = post.image;
-            document.getElementById('postImageWrap').classList.add('visible');
+                counter.classList.remove('visible');
+            }
+        };
+        img.src = post.images[index];
+        document.getElementById('postImageWrap').classList.add('visible');
 
+        if (post.images.length > 1) {
+            counter.textContent = '🖼 ' + (index + 1) + ' / ' + post.images.length;
+            counter.classList.add('visible');
+        } else {
+            counter.classList.remove('visible');
+        }
+    }
+
+    function renderPost(post, index) {
+        const dateStr = '📅 ' + formatDate(post.date);
+        const numStr = 'Įrašas ' + (index + 1) + ' / ' + posts.length;
+        const hasImages = post.images.length > 0;
+        const hasText = post.text.length > 0;
+
+        // Hide both layouts first
+        document.getElementById('postContent').classList.remove('visible');
+        document.getElementById('postTextOnly').classList.remove('visible');
+        if (!hasImages) {
+            document.getElementById('postImageWrap').classList.remove('visible');
+            document.getElementById('imgCounter').classList.remove('visible');
+        }
+
+        if (hasImages) {
+            // Image layout
+            showImage(post, 0);
             document.getElementById('postDate').textContent = dateStr;
-            document.getElementById('postText').innerHTML = escapeHtml(post.text);
+            document.getElementById('postNumber').textContent = numStr;
+            document.getElementById('postTitle').innerHTML = escapeHtml(post.title);
+            document.getElementById('postText').innerHTML = hasText ? escapeHtml(post.text).replace(/\n/g, '<br>') : '';
+            document.getElementById('postText').style.display = hasText ? '' : 'none';
 
             setTimeout(() => {
                 document.getElementById('postContent').classList.add('visible');
                 autoScrollText(document.getElementById('postText'));
-            }, 300);
+            }, 250);
+
+            // Cycle images within post
+            clearInterval(imageTimer);
+            if (post.images.length > 1) {
+                imageTimer = setInterval(() => {
+                    showImage(post, (currentImage + 1) % post.images.length);
+                }, IMAGE_DELAY);
+            }
         } else {
-            renderTextOnly(post, dateStr);
+            // Text-only layout
+            document.getElementById('postDateTextOnly').textContent = dateStr;
+            document.getElementById('postNumberTextOnly').textContent = numStr;
+            document.getElementById('postTitleBig').innerHTML = escapeHtml(post.title);
+            document.getElementById('postTextBig').innerHTML = hasText ? escapeHtml(post.text).replace(/\n/g, '<br>') : '';
+            document.getElementById('postTextBig').style.display = hasText ? '' : 'none';
+            document.getElementById('postTextOnly').classList.add('visible');
+            autoScrollText(document.getElementById('postTextBig'));
         }
 
+        updateDots();
         document.getElementById('loadingScreen').classList.add('hidden');
     }
 
-    function renderTextOnly(post, dateStr) {
-        document.getElementById('postDateTextOnly').textContent = dateStr;
-        document.getElementById('postTextBig').innerHTML = escapeHtml(post.text);
-        document.getElementById('postTextOnly').classList.add('visible');
-        autoScrollText(document.getElementById('postTextBig'));
+    function advancePost() {
+        currentPost = (currentPost + 1) % posts.length;
+        renderPost(posts[currentPost], currentPost);
     }
 
-    // Auto-scroll long text to show full content
-    function autoScrollText(el) {
-        if (!el) return;
-        // Reset scroll
-        el.scrollTop = 0;
-        
-        // Check if content overflows
-        setTimeout(() => {
-            if (el.scrollHeight > el.clientHeight) {
-                let scrollPos = 0;
-                const scrollSpeed = 1; // pixels per frame
-                let scrollDirection = 1;
-                let pauseFrames = 0;
-                const PAUSE_AT_ENDS = 120; // frames to pause at top/bottom
-                
-                function scrollStep() {
-                    if (pauseFrames > 0) {
-                        pauseFrames--;
-                        requestAnimationFrame(scrollStep);
-                        return;
-                    }
-                    
-                    scrollPos += scrollSpeed * scrollDirection;
-                    
-                    // Reverse at bottom
-                    if (scrollPos >= el.scrollHeight - el.clientHeight) {
-                        scrollPos = el.scrollHeight - el.clientHeight;
-                        scrollDirection = -1;
-                        pauseFrames = PAUSE_AT_ENDS;
-                    }
-                    // Reverse at top
-                    if (scrollPos <= 0) {
-                        scrollPos = 0;
-                        scrollDirection = 1;
-                        pauseFrames = PAUSE_AT_ENDS;
-                    }
-                    
-                    el.scrollTop = scrollPos;
-                    requestAnimationFrame(scrollStep);
-                }
-                
-                // Start after initial pause
-                pauseFrames = PAUSE_AT_ENDS;
-                requestAnimationFrame(scrollStep);
-            }
-        }, 500);
+    function startSlideshow() {
+        buildDots();
+        advancePost();
+        clearTimeout(postTimer);
+        postTimer = setInterval(advancePost, POST_DELAY);
     }
 
     // ─── Error state with auto-retry ───
@@ -666,19 +829,33 @@
 
     // ─── Init ───
     async function init() {
-        const item = await fetchLatestPost();
+        const doc = await fetchFeed();
 
-        if (!item) {
+        if (!doc) {
             showError();
             return;
         }
 
-        renderPost(parseItem(item));
+        const items = Array.from(doc.querySelectorAll('item')).slice(0, POST_LIMIT);
+        posts = items.map(parseItem).filter(p => p.title || p.text);
+
+        if (posts.length === 0) {
+            showError();
+            return;
+        }
+
+        // Restart slideshow only on first load or if post count changed
+        if (currentPost === -1 || posts.length !== document.querySelectorAll('.post-dot').length) {
+            clearInterval(postTimer);
+            clearInterval(imageTimer);
+            currentPost = -1;
+            startSlideshow();
+        }
     }
 
     init();
 
-    // Refresh every 5 minutes to pick up new posts
+    // Refresh feed every 5 minutes
     setInterval(init, 5 * 60 * 1000);
 })();
 </script>

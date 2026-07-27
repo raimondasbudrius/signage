@@ -499,6 +499,10 @@
                         <label>Facebook Access Token</label>
                         <input type="password" id="set-facebook_access_token" placeholder="Neveikia statinėje versijoje" disabled title="Facebook API neveikia statinėje versijoje">
                     </div>
+                    <div class="field-group">
+                        <label>Rodomų įrašų skaičius</label>
+                        <input type="number" id="set-facebook_post_limit" min="1" max="10" value="5" title="Kiek paskutinių Facebook įrašų rodyti">
+                    </div>
                 </div>
             </div>
 
@@ -526,7 +530,8 @@
                 <p style="color:#64748b;font-size:0.85rem;line-height:1.8;">
                     Facebook įrašai gaunami per <strong>rss.app</strong> RSS kanalą
                     (<code>https://rss.app/feeds/X0EQ2Ue9pn0SEwIs.xml</code>), kuris palaiko CORS,
-                    todėl veikia ir statinėje versijoje. Rodomas naujausias puslapio įrašas su paveikslėliu.
+                    todėl veikia ir statinėje versijoje. Paskutiniai įrašai rodomi kaip skaidrių demonstracija –
+                    kiekvienas įrašas su visais savo paveikslėliais.
                 </p>
             </div>
         </div>
@@ -554,6 +559,7 @@
         google_slides_id: '1HAUtKaTAkO0XrB7OR2e8lEbvcXf_MZYpQgOy-jt0ls8',
         facebook_page_id: 'Mokykla.Moletai',
         facebook_access_token: '',
+        facebook_post_limit: '5',
         school_name: 'Molėtų progimnazija',
         transition_seconds: '5'
     };

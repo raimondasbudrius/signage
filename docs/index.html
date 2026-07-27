@@ -259,6 +259,7 @@
         google_slides_id: '2PACX-1vQJp88eC9zQQGG_6XGfhvz5g5h9BwKuzdRAOi5ntp93DAdeICS-F3DLB9O0zjZSOgqr6rg3SmBn6zN9',
         facebook_page_id: 'Mokykla.Moletai',
         facebook_access_token: '',
+        facebook_post_limit: '5',
         school_name: 'Molėtų progimnazija',
         transition_seconds: '5'
     };
@@ -327,6 +328,7 @@
                 tvarkarastis_url: settings.tvarkarastis_url || DEFAULT_SETTINGS.tvarkarastis_url,
                 google_slides_id: settings.google_slides_id || DEFAULT_SETTINGS.google_slides_id,
                 facebook_page_id: settings.facebook_page_id || DEFAULT_SETTINGS.facebook_page_id,
+                facebook_post_limit: settings.facebook_post_limit || DEFAULT_SETTINGS.facebook_post_limit,
                 transition_seconds: parseInt(settings.transition_seconds || '5'),
                 schedule: schedule
             };
@@ -352,8 +354,9 @@
 
             // Facebook slideshow page URL - use absolute path for GitHub Pages
             const fbPageId = config.facebook_page_id || 'Mokykla.Moletai';
+            const fbLimit = config.facebook_post_limit || '5';
             const basePath = window.location.pathname.replace(/[^/]*$/, '');
-            const fbSlideshowUrl = `${basePath}facebook.html?page=${encodeURIComponent(fbPageId)}`;
+            const fbSlideshowUrl = `${basePath}facebook.html?page=${encodeURIComponent(fbPageId)}&limit=${encodeURIComponent(fbLimit)}`;
 
             document.getElementById('iframe-tvarkarastis').src = tvUrl;
             document.getElementById('iframe-slides').src = slidesUrl;
