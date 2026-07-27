@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signage – Administravimas</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: #f1f5f9;
+            color: #1e293b;
+            min-height: 100vh;
+        }
+
+        /* ─── Login Screen ─── */
+        .login-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+        }
+
+        .login-screen.hidden { display: none; }
+
+        .login-box {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            width: 380px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+
+        .login-box h1 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .login-box p {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-bottom: 24px;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .login-box input:focus { border-color: #3b82f6; }
+
+        .login-error {
+            color: #ef4444;
+            font-size: 0.85rem;
+            margin-top: 8px;
+            display: none;
+        }
+
+        /* ─── Admin Layout ─── */
+        .admin-app { display: none; }
+        .admin-app.visible { display: block; }
+
+        .admin-header {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .admin-header h1 {
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .admin-header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .admin-content {
+            max-width: 960px;
+            margin: 24px auto;
+            padding: 0 24px;
+        }
+
+        /* ─── Info Banner ─── */
+        .info-banner {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border: 1px solid #93c5fd;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .info-banner .icon {
+            font-size: 1.3rem;
+            flex-shrink: 0;
+        }
+
+        .info-banner p {
+            font-size: 0.85rem;
+            color: #1e40af;
+            line-height: 1.6;
+        }
+
+        .info-banner strong {
+            font-weight: 600;
+        }
+
+        /* ─── Tabs ─── */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 24px;
+            background: white;
+            border-radius: 12px;
+            padding: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px 16px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: #64748b;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover { background: #f1f5f9; }
+        .tab-btn.active { background: #3b82f6; color: white; }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* ─── Cards ─── */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .card h3 {
+            font-size: 1rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ─── Schedule Table ─── */
+        .schedule-list { display: flex; flex-direction: column; gap: 12px; }
+
+        .schedule-entry {
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 12px;
+            align-items: start;
+            transition: border-color 0.2s;
+        }
+
+        .schedule-entry:hover { border-color: #93c5fd; }
+        .schedule-entry.disabled { opacity: 0.5; }
+
+        .entry-drag {
+            cursor: grab;
+            font-size: 1.2rem;
+            color: #94a3b8;
+            padding: 4px;
+            user-select: none;
+        }
+
+        .entry-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .entry-fields .full-width { grid-column: 1 / -1; }
+
+        .field-group { display: flex; flex-direction: column; gap: 4px; }
+
+        .field-group label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .field-group input,
+        .field-group select {
+            padding: 8px 12px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+            font-family: inherit;
+        }
+
+        .field-group input:focus,
+        .field-group select:focus { border-color: #3b82f6; }
+
+        .entry-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* ─── Day Checkboxes ─── */
+        .day-checkboxes {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .day-checkboxes label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #475569;
+            cursor: pointer;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+        .day-checkboxes input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #3b82f6;
+        }
+
+        /* ─── Buttons ─── */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+
+        .btn-success { background: #22c55e; color: white; }
+        .btn-success:hover { background: #16a34a; }
+
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+
+        .btn-ghost {
+            background: transparent;
+            color: #64748b;
+            border: 1.5px solid #e2e8f0;
+        }
+        .btn-ghost:hover { background: #f1f5f9; }
+
+        .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            border: 1.5px solid #e2e8f0;
+            background: white;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        .btn-icon:hover { background: #f1f5f9; }
+        .btn-icon.danger:hover { background: #fef2f2; border-color: #fca5a5; }
+
+        /* ─── Settings Form ─── */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .settings-grid .full-width { grid-column: 1 / -1; }
+
+        /* ─── Toast ─── */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1e293b;
+            color: white;
+            padding: 14px 24px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 999;
+        }
+
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { background: #16a34a; }
+        .toast.error { background: #dc2626; }
+
+        /* ─── Status Badge ─── */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-badge.online { background: #dcfce7; color: #16a34a; }
+        .status-badge.offline { background: #fef2f2; color: #dc2626; }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* ─── Toggle Switch ─── */
+        .toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            cursor: pointer;
+        }
+
+        .toggle input { display: none; }
+
+        .toggle-slider {
+            position: absolute;
+            inset: 0;
+            background: #cbd5e1;
+            border-radius: 12px;
+            transition: 0.2s;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: white;
+            top: 3px;
+            left: 3px;
+            transition: 0.2s;
+        }
+
+        .toggle input:checked + .toggle-slider { background: #3b82f6; }
+        .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+        /* ─── Responsive ─── */
+        @media (max-width: 768px) {
+            .entry-fields { grid-template-columns: 1fr; }
+            .settings-grid { grid-template-columns: 1fr; }
+            .schedule-entry { grid-template-columns: 1fr; }
+            .entry-drag { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ─── Login Screen ─── -->
+<div class="login-screen" id="loginScreen">
+    <div class="login-box">
+        <h1>🖥️ Signage Admin</h1>
+        <p>Molėtų progimnazijos informacinis ekranas</p>
+        <input type="password" id="loginPassword" placeholder="Slaptažodis" autocomplete="current-password">
+        <div class="login-error" id="loginError">Neteisingas slaptažodis</div>
+        <button class="btn btn-primary" style="width:100%;margin-top:16px;justify-content:center;" onclick="doLogin()">
+            Prisijungti
+        </button>
+        <p style="margin-top:16px;font-size:0.75rem;color:#94a3b8;">
+            Statinė versija – slaptažodis: <code>admin123</code>
+        </p>
+    </div>
+</div>
+
+<!-- ─── Admin App ─── -->
+<div class="admin-app" id="adminApp">
+    <div class="admin-header">
+        <h1>🖥️ Signage Administravimas</h1>
+        <div class="admin-header-actions">
+            <a href="./" target="_blank" class="btn btn-ghost btn-sm">📺 Atidaryti ekraną</a>
+            <button class="btn btn-ghost btn-sm" onclick="doLogout()">Atsijungti</button>
+        </div>
+    </div>
+
+    <div class="admin-content">
+        <!-- Info Banner -->
+        <div class="info-banner">
+            <div class="icon">💾</div>
+            <p>
+                <strong>Statinė versija (GitHub Pages):</strong> Nustatymai saugomi šio naršyklės <code>localStorage</code>.
+                Pakeitimai galioja tik šiame įrenginyje/naršyklėje. Jei atidarysite ekraną kitame įrenginyje,
+                reikės nustatymus sukonfigūruoti iš naujo. Facebook įrašai neveikia be serverio (CORS ribojimai).
+            </p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="schedule" onclick="switchTab('schedule')">📅 Tvarkaraštis</button>
+            <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Nustatymai</button>
+        </div>
+
+        <!-- ─── Schedule Tab ─── -->
+        <div class="tab-panel active" id="tab-schedule">
+            <div class="card">
+                <h3>📅 Rodymo tvarkaraštis</h3>
+                <p style="color:#64748b;font-size:0.85rem;margin-bottom:16px;">
+                    Nustatykite, kada ir kiek laiko rodyti kiekvieną šaltinį. Šaltiniai rodomi eilės tvarka pagal „Rodymo trukmę".
+                </p>
+                <div class="schedule-list" id="scheduleList"></div>
+                <div style="margin-top:16px;display:flex;gap:12px;">
+                    <button class="btn btn-ghost" onclick="addScheduleEntry()">➕ Pridėti šaltinį</button>
+                    <button class="btn btn-success" onclick="saveSchedule()">💾 Išsaugoti tvarkaraštį</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>ℹ️ Kaip tai veikia?</h3>
+                <ul style="color:#64748b;font-size:0.85rem;line-height:1.8;padding-left:20px;">
+                    <li><strong>Tvarkaraštis</strong> – kiekvienas šaltinis turi laiko langą (nuo–iki) ir dienas, kuriomis jis aktyvus.</li>
+                    <li><strong>Rodymo trukmė</strong> – kiek sekundžių šaltinis rodomas prieš perjungiant į kitą.</li>
+                    <li><strong>Eilės tvarka</strong> – šaltiniai rodomi pagal „sort_order" (vilkitite ⠿ arba keiskite rodyklėmis).</li>
+                    <li><strong>Aktyvus langas</strong> – jei dabartinis laikas patenka į kelių šaltinių langus, jie rodomi paeiliui.</li>
+                    <li><strong>Jei nėra aktyvaus šaltinio</strong> – rodomas laukimo ekranas su laikrodžiu.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ─── Settings Tab ─── -->
+        <div class="tab-panel" id="tab-settings">
+            <div class="card">
+                <h3>🔗 Šaltinių nuorodos</h3>
+                <div class="settings-grid">
+                    <div class="field-group full-width">
+                        <label>Tvarkaraščio URL</label>
+                        <input type="text" id="set-tvarkarastis_url" placeholder="https://...">
+                    </div>
+                    <div class="field-group full-width">
+                        <label>Google Slides ID (iš URL)</label>
+                        <input type="text" id="set-google_slides_id" placeholder="1HAUtKaTAkO0XrB7OR2e8lEbvcXf_MZYpQgOy-jt0ls8">
+                    </div>
+                    <div class="field-group">
+                        <label>Facebook puslapio ID</label>
+                        <input type="text" id="set-facebook_page_id" placeholder="Mokykla.Moletai" disabled title="Facebook API neveikia statinėje versijoje">
+                    </div>
+                    <div class="field-group">
+                        <label>Facebook Access Token</label>
+                        <input type="password" id="set-facebook_access_token" placeholder="Neveikia statinėje versijoje" disabled title="Facebook API neveikia statinėje versijoje">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🏫 Bendri nustatymai</h3>
+                <div class="settings-grid">
+                    <div class="field-group">
+                        <label>Mokyklos pavadinimas</label>
+                        <input type="text" id="set-school_name" placeholder="Molėtų progimnazija">
+                    </div>
+                    <div class="field-group">
+                        <label>Perėjimo trukmė (sek.)</label>
+                        <input type="number" id="set-transition_seconds" min="1" max="30" value="5">
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:12px;">
+                <button class="btn btn-success" onclick="saveSettings()">💾 Išsaugoti nustatymus</button>
+                <button class="btn btn-danger" onclick="resetToDefaults()">🔄 Atstatyti numatytuosius</button>
+            </div>
+
+            <div class="card" style="margin-top:16px;">
+                <h3>📱 Dėl Facebook įrašų</h3>
+                <p style="color:#64748b;font-size:0.85rem;line-height:1.8;">
+                    Facebook Graph API neleidžia tiesioginių užklausų iš naršyklės (CORS ribojimai),
+                    todėl statinėje versijoje Facebook įrašai nerodomi. Jei norite šios funkcijos,
+                    naudokite serverinę versiją (<code>npm start</code>).
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+    'use strict';
+
+    // ─── LocalStorage Data Layer ───
+    const STORAGE_KEYS = {
+        schedule: 'signage_schedule',
+        settings: 'signage_settings',
+        auth: 'signage_admin_auth'
+    };
+
+    const ADMIN_PASSWORD = 'admin123';
+
+    const DEFAULT_SETTINGS = {
+        tvarkarastis_url: 'https://raimondasbudrius.github.io/tvarkarastis/',
+        google_slides_id: '1HAUtKaTAkO0XrB7OR2e8lEbvcXf_MZYpQgOy-jt0ls8',
+        facebook_page_id: 'Mokykla.Moletai',
+        facebook_access_token: '',
+        school_name: 'Molėtų progimnazija',
+        transition_seconds: '5'
+    };
+
+    const DEFAULT_SCHEDULE = [
+        { id: 1, name: 'Tvarkaraštis', source_type: 'tvarkarastis', start_time: '07:00', end_time: '17:00', duration_seconds: 120, days: '1,2,3,4,5', enabled: 1, sort_order: 1 },
+        { id: 2, name: 'Google skaidrės', source_type: 'slides', start_time: '07:00', end_time: '17:00', duration_seconds: 120, days: '1,2,3,4,5', enabled: 1, sort_order: 2 },
+        { id: 3, name: 'Facebook naujienos', source_type: 'facebook', start_time: '07:00', end_time: '17:00', duration_seconds: 120, days: '1,2,3,4,5', enabled: 1, sort_order: 3 }
+    ];
+
+    let scheduleData = [];
+
+    const SOURCE_TYPES = {
+        tvarkarastis: { label: '📋 Tvarkaraštis', color: '#3b82f6' },
+        slides: { label: '📊 Google skaidrės', color: '#8b5cf6' },
+        facebook: { label: '📘 Facebook', color: '#1877f2' }
+    };
+
+    const DAY_LABELS = ['Sek', 'Pr', 'An', 'Tr', 'Kt', 'Pn', 'Št'];
+
+    // ─── Storage Functions ───
+    function getSettings() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEYS.settings);
+            if (raw) return JSON.parse(raw);
+        } catch (e) { console.warn('Settings parse error:', e); }
+        return { ...DEFAULT_SETTINGS };
+    }
+
+    function saveSettingsToStorage(settings) {
+        localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings));
+    }
+
+    function getScheduleFromStorage() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEYS.schedule);
+            if (raw) return JSON.parse(raw);
+        } catch (e) { console.warn('Schedule parse error:', e); }
+        return DEFAULT_SCHEDULE.map(e => ({ ...e }));
+    }
+
+    function saveScheduleToStorage(entries) {
+        localStorage.setItem(STORAGE_KEYS.schedule, JSON.stringify(entries));
+    }
+
+    // ─── Auth (client-side, session-based) ───
+    function checkAuth() {
+        const isAuthed = sessionStorage.getItem(STORAGE_KEYS.auth) === 'true';
+        if (isAuthed) {
+            showAdmin();
+        } else {
+            showLogin();
+        }
+    }
+
+    function showLogin() {
+        document.getElementById('loginScreen').classList.remove('hidden');
+        document.getElementById('adminApp').classList.remove('visible');
+    }
+
+    function showAdmin() {
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('adminApp').classList.add('visible');
+        loadSchedule();
+        loadSettings();
+    }
+
+    window.doLogin = function() {
+        const password = document.getElementById('loginPassword').value;
+        if (password === ADMIN_PASSWORD) {
+            sessionStorage.setItem(STORAGE_KEYS.auth, 'true');
+            document.getElementById('loginError').style.display = 'none';
+            showAdmin();
+        } else {
+            document.getElementById('loginError').style.display = 'block';
+        }
+    };
+
+    window.doLogout = function() {
+        sessionStorage.removeItem(STORAGE_KEYS.auth);
+        showLogin();
+    };
+
+    // Enter key on password field
+    document.getElementById('loginPassword').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') doLogin();
+    });
+
+    // ─── Tabs ───
+    window.switchTab = function(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${tab}`));
+    };
+
+    // ─── Schedule ───
+    function loadSchedule() {
+        scheduleData = getScheduleFromStorage();
+        renderSchedule();
+    }
+
+    function renderSchedule() {
+        const container = document.getElementById('scheduleList');
+        container.innerHTML = '';
+
+        scheduleData.forEach((entry, index) => {
+            const days = entry.days.split(',').map(Number);
+            const el = document.createElement('div');
+            el.className = `schedule-entry${entry.enabled ? '' : ' disabled'}`;
+            el.dataset.index = index;
+
+            el.innerHTML = `
+                <div class="entry-drag" title="Vilkti pertvarkymui">⠿</div>
+                <div class="entry-fields">
+                    <div class="field-group">
+                        <label>Pavadinimas</label>
+                        <input type="text" value="${esc(entry.name)}" onchange="updateEntry(${index}, 'name', this.value)">
+                    </div>
+                    <div class="field-group">
+                        <label>Šaltinis</label>
+                        <select onchange="updateEntry(${index}, 'source_type', this.value)">
+                            ${Object.entries(SOURCE_TYPES).map(([k, v]) =>
+                                `<option value="${k}" ${entry.source_type === k ? 'selected' : ''}>${v.label}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label>Nuo</label>
+                        <input type="time" value="${entry.start_time}" onchange="updateEntry(${index}, 'start_time', this.value)">
+                    </div>
+                    <div class="field-group">
+                        <label>Iki</label>
+                        <input type="time" value="${entry.end_time}" onchange="updateEntry(${index}, 'end_time', this.value)">
+                    </div>
+                    <div class="field-group">
+                        <label>Rodymo trukmė (sek.)</label>
+                        <input type="number" min="10" max="600" value="${entry.duration_seconds}" onchange="updateEntry(${index}, 'duration_seconds', parseInt(this.value))">
+                    </div>
+                    <div class="field-group">
+                        <label>Dienos</label>
+                        <div class="day-checkboxes">
+                            ${DAY_LABELS.map((label, d) => `
+                                <label>
+                                    <input type="checkbox" ${days.includes(d) ? 'checked' : ''}
+                                        onchange="toggleDay(${index}, ${d}, this.checked)">
+                                    ${label}
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+                <div class="entry-actions">
+                    <label class="toggle" title="Įjungti/Išjungti">
+                        <input type="checkbox" ${entry.enabled ? 'checked' : ''} onchange="updateEntry(${index}, 'enabled', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <button class="btn-icon" onclick="moveEntry(${index}, -1)" title="Perkelti aukštyn" ${index === 0 ? 'disabled style="opacity:0.3"' : ''}>↑</button>
+                    <button class="btn-icon" onclick="moveEntry(${index}, 1)" title="Perkelti žemyn" ${index === scheduleData.length - 1 ? 'disabled style="opacity:0.3"' : ''}>↓</button>
+                    <button class="btn-icon danger" onclick="removeEntry(${index})" title="Pašalinti">🗑</button>
+                </div>
+            `;
+
+            container.appendChild(el);
+        });
+    }
+
+    window.updateEntry = function(index, field, value) {
+        scheduleData[index][field] = value;
+        if (field === 'enabled') {
+            scheduleData[index][field] = value ? 1 : 0;
+            renderSchedule();
+        }
+    };
+
+    window.toggleDay = function(index, day, checked) {
+        let days = scheduleData[index].days.split(',').map(Number).filter(d => d !== day);
+        if (checked) days.push(day);
+        days.sort();
+        scheduleData[index].days = days.join(',');
+    };
+
+    window.moveEntry = function(index, direction) {
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= scheduleData.length) return;
+        [scheduleData[index], scheduleData[newIndex]] = [scheduleData[newIndex], scheduleData[index]];
+        // Update sort_order
+        scheduleData.forEach((e, i) => e.sort_order = i + 1);
+        renderSchedule();
+    };
+
+    window.removeEntry = function(index) {
+        if (confirm('Ar tikrai norite pašalinti šį šaltinį?')) {
+            scheduleData.splice(index, 1);
+            scheduleData.forEach((e, i) => e.sort_order = i + 1);
+            renderSchedule();
+        }
+    };
+
+    window.addScheduleEntry = function() {
+        scheduleData.push({
+            id: Date.now(),
+            name: 'Naujas šaltinis',
+            source_type: 'tvarkarastis',
+            start_time: '07:00',
+            end_time: '17:00',
+            duration_seconds: 120,
+            days: '1,2,3,4,5',
+            enabled: 1,
+            sort_order: scheduleData.length + 1
+        });
+        renderSchedule();
+    };
+
+    window.saveSchedule = function() {
+        try {
+            saveScheduleToStorage(scheduleData);
+            showToast('✅ Tvarkaraštis išsaugotas!', 'success');
+        } catch (err) {
+            showToast('Klaida: ' + err.message, 'error');
+        }
+    };
+
+    // ─── Settings ───
+    function loadSettings() {
+        const settings = getSettings();
+        Object.entries(settings).forEach(([key, value]) => {
+            const el = document.getElementById(`set-${key}`);
+            if (el) el.value = value || '';
+        });
+    }
+
+    window.saveSettings = function() {
+        const settings = {};
+        document.querySelectorAll('[id^="set-"]').forEach(el => {
+            const key = el.id.replace('set-', '');
+            settings[key] = el.value;
+        });
+
+        try {
+            saveSettingsToStorage(settings);
+            showToast('✅ Nustatymai išsaugoti!', 'success');
+        } catch (err) {
+            showToast('Klaida: ' + err.message, 'error');
+        }
+    };
+
+    window.resetToDefaults = function() {
+        if (confirm('Ar tikrai norite atstatyti visus nustatymus į numatytuosius?')) {
+            saveSettingsToStorage({ ...DEFAULT_SETTINGS });
+            saveScheduleToStorage(DEFAULT_SCHEDULE.map(e => ({ ...e })));
+            loadSchedule();
+            loadSettings();
+            showToast('🔄 Nustatymai atstatyti!', 'success');
+        }
+    };
+
+    // ─── Toast ───
+    function showToast(message, type = '') {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = `toast show ${type}`;
+        setTimeout(() => { toast.className = 'toast'; }, 3000);
+    }
+
+    function esc(str) {
+        const div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+    }
+
+    // ─── Init ───
+    checkAuth();
+
+})();
+</script>
+</body>
+</html>
