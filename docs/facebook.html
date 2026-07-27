@@ -452,11 +452,17 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // ─── RSS-Bridge instances (public, no auth needed) ───
+    // ─── RSS-Bridge instances + CORS proxies (public, no auth needed) ───
     const BRIDGES = [
         'https://rss-bridge.org/bridge01/',
-        'https://bridge.suumitsu.eu/',
-        'https://rss-bridge.sunknudsen.com/'
+        'https://bridge.suumitsu.eu/'
+    ];
+
+    // CORS proxies to bypass browser restrictions on GitHub Pages
+    const CORS_PROXIES = [
+        url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+        url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
+        url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url)
     ];
 
     function bridgeUrl(base) {
@@ -477,14 +483,19 @@
     }
 
     async function fetchLatestPost() {
+        // Try each bridge through each CORS proxy
         for (const base of BRIDGES) {
-            try {
-                document.getElementById('loadingSub').textContent = 'Bandoma: ' + base.replace('https://', '').replace('/', '');
-                const data = await fetchWithTimeout(bridgeUrl(base), 10000);
-                const items = data.items || [];
-                if (items.length > 0) return items[0]; // Latest post only
-            } catch (e) {
-                console.warn('Bridge failed:', base, e.message);
+            const target = bridgeUrl(base);
+            for (const proxy of CORS_PROXIES) {
+                try {
+                    const proxyUrl = proxy(target);
+                    document.getElementById('loadingSub').textContent = 'Bandoma: ' + proxyUrl.split('/')[2];
+                    const data = await fetchWithTimeout(proxyUrl, 12000);
+                    const items = data.items || [];
+                    if (items.length > 0) return items[0]; // Latest post only
+                } catch (e) {
+                    console.warn('Proxy failed:', e.message);
+                }
             }
         }
         return null;
