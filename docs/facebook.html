@@ -452,11 +452,8 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // ─── RSS-Bridge instances + CORS proxies (public, no auth needed) ───
-    const BRIDGES = [
-        'https://rss-bridge.org/bridge01/',
-        'https://bridge.suumitsu.eu/'
-    ];
+    // ─── RSS feed from rss.app ───
+    const RSS_FEED_URL = 'https://rss.app/feeds/X0EQ2Ue9pn0SEwIs.xml';
 
     // CORS proxies to bypass browser restrictions on GitHub Pages
     const CORS_PROXIES = [
@@ -465,68 +462,100 @@
         url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url)
     ];
 
-    function bridgeUrl(base) {
-        return base + '?action=display&bridge=FacebookBridge&context=User&u=' +
-            encodeURIComponent(PAGE_ID) + '&format=Json';
-    }
-
-    async function fetchWithTimeout(url, ms) {
+    async function fetchXmlWithTimeout(url, ms) {
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), ms);
         try {
             const res = await fetch(url, { signal: ctrl.signal });
             if (!res.ok) throw new Error('HTTP ' + res.status);
-            return await res.json();
+            const text = await res.text();
+            return new DOMParser().parseFromString(text, 'text/xml');
         } finally {
             clearTimeout(t);
         }
     }
 
     async function fetchLatestPost() {
-        // Try each bridge through each CORS proxy
-        for (const base of BRIDGES) {
-            const target = bridgeUrl(base);
-            for (const proxy of CORS_PROXIES) {
-                try {
-                    const proxyUrl = proxy(target);
-                    document.getElementById('loadingSub').textContent = 'Bandoma: ' + proxyUrl.split('/')[2];
-                    const data = await fetchWithTimeout(proxyUrl, 12000);
-                    const items = data.items || [];
-                    if (items.length > 0) return items[0]; // Latest post only
-                } catch (e) {
-                    console.warn('Proxy failed:', e.message);
+        // Try direct fetch first
+        try {
+            document.getElementById('loadingSub').textContent = 'Bandoma tiesiogiai…';
+            const doc = await fetchXmlWithTimeout(RSS_FEED_URL, 10000);
+            const item = doc.querySelector('item');
+            if (item) return item;
+        } catch (e) {
+            console.warn('Direct fetch failed:', e.message);
+        }
+
+        // Try through CORS proxies
+        for (const proxy of CORS_PROXIES) {
+            try {
+                const proxyUrl = proxy(RSS_FEED_URL);
+                const proxyHost = proxyUrl.split('://')[1]?.split('/')[0] || 'proxy';
+                document.getElementById('loadingSub').textContent = 'Bandoma: ' + proxyHost;
+                const doc = await fetchXmlWithTimeout(proxyUrl, 12000);
+                
+                // Check for parse errors
+                const parseError = doc.querySelector('parsererror');
+                if (parseError) throw new Error('XML parse error');
+                
+                const item = doc.querySelector('item');
+                if (item) {
+                    console.log('Success via proxy:', proxyHost);
+                    return item;
                 }
+            } catch (e) {
+                console.warn('Proxy failed:', e.message);
             }
         }
         return null;
     }
 
-    // ─── Parse bridge item ───
+    // ─── Parse RSS item ───
     function parseItem(item) {
-        let text = item.content_text || '';
-        if (!text && item.content_html) {
+        // Get text from description or title
+        let text = '';
+        const descEl = item.querySelector('description');
+        if (descEl && descEl.textContent) {
+            // Strip HTML tags from description
             const tmp = document.createElement('div');
-            tmp.innerHTML = item.content_html;
+            tmp.innerHTML = descEl.textContent;
             text = tmp.textContent || '';
         }
-        text = text.replace(/\s+/g, ' ').trim();
-        if (!text) text = item.title || 'Naujausias įrašas';
-
-        // Image: from attachments or first <img> in content_html
-        let image = null;
-        if (item.attachments && item.attachments.length) {
-            const img = item.attachments.find(a => (a.mime_type || '').startsWith('image/'));
-            if (img) image = img.url;
+        if (!text) {
+            const titleEl = item.querySelector('title');
+            text = titleEl ? titleEl.textContent : 'Naujausias įrašas';
         }
-        if (!image && item.content_html) {
+        text = text.replace(/\s+/g, ' ').trim();
+
+        // Image: from enclosure, media:content, or first <img> in description
+        let image = null;
+        
+        // Try enclosure element
+        const enclosure = item.querySelector('enclosure');
+        if (enclosure && enclosure.getAttribute('type')?.startsWith('image/')) {
+            image = enclosure.getAttribute('url');
+        }
+        
+        // Try media:content or media:thumbnail
+        if (!image) {
+            const mediaContent = item.getElementsByTagName('media:content')[0] || 
+                               item.getElementsByTagName('media:thumbnail')[0];
+            if (mediaContent) {
+                image = mediaContent.getAttribute('url');
+            }
+        }
+        
+        // Try first <img> in description
+        if (!image && descEl && descEl.textContent) {
             const tmp = document.createElement('div');
-            tmp.innerHTML = item.content_html;
+            tmp.innerHTML = descEl.textContent;
             const imgEl = tmp.querySelector('img');
             if (imgEl) image = imgEl.src;
         }
 
-        const ts = item.date_published || item.timestamp || null;
-        const date = ts ? new Date(typeof ts === 'number' ? ts * 1000 : ts) : null;
+        // Date from pubDate
+        const pubDateEl = item.querySelector('pubDate');
+        const date = pubDateEl ? new Date(pubDateEl.textContent) : null;
 
         return { text, image, date };
     }
