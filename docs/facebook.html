@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook naujienos – Molėtų progimnazija</title>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Archivo+Black&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --fb-blue: #1877f2;
+            --fb-blue-light: #4d9fff;
+            --ink: #0a1424;
+            --paper: #f4f7fb;
+        }
+
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: 'Manrope', sans-serif;
+            background: var(--ink);
+            color: white;
+        }
+
+        /* ─── Layered ambient background ─── */
+        .bg-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background:
+                radial-gradient(ellipse 80% 60% at 85% -10%, rgba(24,119,242,0.28) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 50% at -10% 110%, rgba(24,119,242,0.18) 0%, transparent 55%),
+                linear-gradient(160deg, #0d1b30 0%, #0a1424 55%, #081020 100%);
+        }
+
+        .bg-dots {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 26px 26px;
+            mask-image: linear-gradient(180deg, transparent 0%, black 30%, black 70%, transparent 100%);
+        }
+
+        .bg-beam {
+            position: fixed;
+            top: -30%;
+            right: -10%;
+            width: 45vw;
+            height: 160vh;
+            z-index: 0;
+            background: linear-gradient(90deg, transparent, rgba(24,119,242,0.07), transparent);
+            transform: rotate(18deg);
+            animation: beamDrift 14s ease-in-out infinite alternate;
+        }
+
+        @keyframes beamDrift {
+            from { transform: rotate(18deg) translateX(0); opacity: 0.6; }
+            to   { transform: rotate(18deg) translateX(-8vw); opacity: 1; }
+        }
+
+        /* ─── Header ─── */
+        .top-bar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 50;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 22px 36px;
+            background: linear-gradient(180deg, rgba(8,16,32,0.92) 0%, rgba(8,16,32,0.55) 65%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .fb-badge {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            background: linear-gradient(145deg, var(--fb-blue-light), var(--fb-blue));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 2rem;
+            box-shadow: 0 6px 24px rgba(24,119,242,0.45);
+            animation: badgePulse 4s ease-in-out infinite;
+        }
+
+        @keyframes badgePulse {
+            0%, 100% { box-shadow: 0 6px 24px rgba(24,119,242,0.45); }
+            50%      { box-shadow: 0 6px 36px rgba(24,119,242,0.75); }
+        }
+
+        .brand-text .kicker {
+            font-family: 'Archivo', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.28em;
+            text-transform: uppercase;
+            color: var(--fb-blue-light);
+        }
+
+        .brand-text .title {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 1.35rem;
+            letter-spacing: 0.01em;
+        }
+
+        .live-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            margin-top: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.55);
+        }
+
+        .live-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: liveBlink 1.6s ease-in-out infinite;
+        }
+
+        @keyframes liveBlink {
+            0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(34,197,94,0.8); }
+            50%      { opacity: 0.35; box-shadow: none; }
+        }
+
+        .clock-area { text-align: right; }
+
+        .clock-time {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 2.1rem;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+        }
+
+        .clock-date {
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: rgba(255,255,255,0.55);
+            margin-top: 5px;
+            text-transform: capitalize;
+        }
+
+        /* ─── Slides ─── */
+        .stage {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+        }
+
+        .slide {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.9s ease, visibility 0.9s;
+        }
+
+        .slide.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Image post layout */
+        .slide-image-wrap {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+        }
+
+        .slide-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scale(1.08);
+        }
+
+        .slide.active .slide-image {
+            animation: kenburns 16s ease-out forwards;
+        }
+
+        @keyframes kenburns {
+            from { transform: scale(1.08) translate(0, 0); }
+            to   { transform: scale(1.16) translate(-1.5%, -1%); }
+        }
+
+        .slide-image-wrap::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg,
+                rgba(8,16,32,0.55) 0%,
+                rgba(8,16,32,0.05) 30%,
+                rgba(8,16,32,0.15) 55%,
+                rgba(8,16,32,0.94) 100%);
+        }
+
+        .slide-content {
+            position: absolute;
+            left: 0; right: 0; bottom: 0;
+            z-index: 2;
+            padding: 0 56px 110px;
+            max-width: 1100px;
+        }
+
+        .slide-meta {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+
+        .slide-date-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(24,119,242,0.9);
+            padding: 8px 16px;
+            border-radius: 100px;
+            font-family: 'Archivo', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .slide-reactions {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.75);
+        }
+
+        .slide-text {
+            font-size: clamp(1.4rem, 2.6vw, 2.3rem);
+            font-weight: 600;
+            line-height: 1.35;
+            text-shadow: 0 2px 16px rgba(0,0,0,0.6);
+            display: -webkit-box;
+            -webkit-line-clamp: 5;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .slide.active .slide-content {
+            animation: riseIn 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
+        }
+
+        @keyframes riseIn {
+            from { opacity: 0; transform: translateY(36px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Text-only post layout */
+        .slide-textonly {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 120px 8vw 140px;
+            text-align: center;
+            background:
+                radial-gradient(ellipse 70% 55% at 50% 45%, rgba(24,119,242,0.16) 0%, transparent 70%);
+        }
+
+        .slide-textonly .big-quote {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 6rem;
+            line-height: 0.6;
+            color: var(--fb-blue);
+            margin-bottom: 36px;
+            opacity: 0.9;
+        }
+
+        .slide-textonly .slide-text {
+            font-size: clamp(1.8rem, 3.4vw, 3.2rem);
+            font-weight: 700;
+            -webkit-line-clamp: 6;
+        }
+
+        .slide-textonly .slide-meta {
+            justify-content: center;
+            margin-top: 32px;
+            margin-bottom: 0;
+        }
+
+        /* ─── Footer / progress ─── */
+        .bottom-bar {
+            position: fixed;
+            left: 0; right: 0; bottom: 0;
+            z-index: 50;
+            padding: 0 36px 26px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(0deg, rgba(8,16,32,0.85) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .counter {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 1.1rem;
+            font-variant-numeric: tabular-nums;
+            color: rgba(255,255,255,0.85);
+        }
+
+        .counter .total { color: rgba(255,255,255,0.4); font-size: 0.85rem; }
+
+        .dots {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 100px;
+            background: rgba(255,255,255,0.25);
+            transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .dot.active {
+            width: 34px;
+            background: var(--fb-blue-light);
+            box-shadow: 0 0 12px rgba(77,159,255,0.7);
+        }
+
+        .page-handle {
+            font-family: 'Archivo', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.5);
+            letter-spacing: 0.05em;
+        }
+
+        .progress-track {
+            position: fixed;
+            left: 0; right: 0; bottom: 0;
+            height: 5px;
+            z-index: 60;
+            background: rgba(255,255,255,0.08);
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--fb-blue), var(--fb-blue-light));
+            box-shadow: 0 0 14px rgba(24,119,242,0.8);
+            transition: width 0.25s linear;
+        }
+
+        /* ─── Loading / fallback states ─── */
+        .state-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--ink);
+            transition: opacity 0.6s;
+        }
+
+        .state-screen.hidden { opacity: 0; pointer-events: none; }
+
+        .loader-ring {
+            width: 64px;
+            height: 64px;
+            border: 4px solid rgba(24,119,242,0.2);
+            border-top-color: var(--fb-blue);
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .state-msg {
+            margin-top: 26px;
+            font-family: 'Archivo', sans-serif;
+            font-weight: 600;
+            font-size: 1.05rem;
+            color: rgba(255,255,255,0.7);
+        }
+
+        .state-sub {
+            margin-top: 10px;
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.4);
+        }
+
+        .fallback-frame {
+            position: fixed;
+            inset: 0;
+            z-index: 90;
+            background: white;
+            display: none;
+        }
+
+        .fallback-frame.visible { display: block; }
+
+        .fallback-frame iframe { width: 100%; height: 100%; border: none; }
+    </style>
+</head>
+<body>
+
+    <div class="bg-layer"></div>
+    <div class="bg-dots"></div>
+    <div class="bg-beam"></div>
+
+    <!-- Header -->
+    <div class="top-bar">
+        <div class="brand">
+            <div class="fb-badge">f</div>
+            <div class="brand-text">
+                <div class="kicker">Molėtų progimnazija</div>
+                <div class="title">Naujienos iš Facebook</div>
+                <div class="live-chip"><span class="live-dot"></span> Tiesiogiai iš puslapio</div>
+            </div>
+        </div>
+        <div class="clock-area">
+            <div class="clock-time" id="clockTime">--:--</div>
+            <div class="clock-date" id="clockDate"></div>
+        </div>
+    </div>
+
+    <!-- Slides -->
+    <div class="stage" id="stage"></div>
+
+    <!-- Footer -->
+    <div class="bottom-bar">
+        <div class="counter"><span id="slideNum">01</span> <span class="total">/ <span id="slideTotal">--</span></span></div>
+        <div class="dots" id="dots"></div>
+        <div class="page-handle" id="pageHandle">facebook.com/Mokykla.Moletai</div>
+    </div>
+
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+    <!-- Loading -->
+    <div class="state-screen" id="loadingScreen">
+        <div class="loader-ring"></div>
+        <div class="state-msg">Kraunami Facebook įrašai…</div>
+        <div class="state-sub" id="loadingSub">Jungiamasi prie naujienų šaltinio</div>
+    </div>
+
+    <!-- Fallback: embedded page plugin -->
+    <div class="fallback-frame" id="fallbackFrame">
+        <iframe id="fallbackIframe" src="about:blank"></iframe>
+    </div>
+
+<script>
+(function() {
+    'use strict';
+
+    // ─── Config from URL params ───
+    const params = new URLSearchParams(window.location.search);
+    const PAGE_ID = params.get('page') || 'Mokykla.Moletai';
+    const DELAY_SECONDS = Math.max(4, parseInt(params.get('delay') || '12', 10));
+    const MAX_POSTS = Math.min(12, parseInt(params.get('limit') || '8', 10));
+
+    document.getElementById('pageHandle').textContent = 'facebook.com/' + PAGE_ID;
+
+    const DAY_NAMES = ['Sekmadienis', 'Pirmadienis', 'Antradienis', 'Trečiadienis', 'Ketvirtadienis', 'Penktadienis', 'Šeštadienis'];
+    const MONTH_NAMES = ['sausio', 'vasario', 'kovo', 'balandžio', 'gegužės', 'birželio', 'liepos', 'rugpjūčio', 'rugsėjo', 'spalio', 'lapkričio', 'gruodžio'];
+    const MONTH_SHORT = ['Sau', 'Vas', 'Kov', 'Bal', 'Geg', 'Bir', 'Lie', 'Rgp', 'Rgs', 'Spa', 'Lap', 'Gru'];
+
+    // ─── Clock ───
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('clockTime').textContent =
+            String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('clockDate').textContent =
+            DAY_NAMES[now.getDay()] + ', ' + now.getFullYear() + ' m. ' + MONTH_NAMES[now.getMonth()] + ' ' + now.getDate() + ' d.';
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ─── RSS-Bridge instances (public, no auth needed) ───
+    const BRIDGES = [
+        'https://rss-bridge.org/bridge01/',
+        'https://bridge.suumitsu.eu/',
+        'https://rss-bridge.sunknudsen.com/'
+    ];
+
+    function bridgeUrl(base) {
+        return base + '?action=display&bridge=FacebookBridge&context=User&u=' +
+            encodeURIComponent(PAGE_ID) + '&format=Json';
+    }
+
+    async function fetchWithTimeout(url, ms) {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), ms);
+        try {
+            const res = await fetch(url, { signal: ctrl.signal });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return await res.json();
+        } finally {
+            clearTimeout(t);
+        }
+    }
+
+    async function fetchPosts() {
+        for (const base of BRIDGES) {
+            try {
+                document.getElementById('loadingSub').textContent = 'Bandoma: ' + base.replace('https://', '').replace('/', '');
+                const data = await fetchWithTimeout(bridgeUrl(base), 9000);
+                const items = (data.items || []).slice(0, MAX_POSTS);
+                if (items.length > 0) return items;
+            } catch (e) {
+                console.warn('Bridge failed:', base, e.message);
+            }
+        }
+        return null;
+    }
+
+    // ─── Parse a bridge item into a post ───
+    function parseItem(item) {
+        let text = item.content_text || '';
+        if (!text && item.content_html) {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = item.content_html;
+            text = tmp.textContent || '';
+        }
+        text = text.replace(/\s+/g, ' ').trim();
+        if (!text) text = item.title || 'Nuotrauka';
+
+        // Image: from attachments or first <img> in content_html
+        let image = null;
+        if (item.attachments && item.attachments.length) {
+            const img = item.attachments.find(a => (a.mime_type || '').startsWith('image/'));
+            if (img) image = img.url;
+        }
+        if (!image && item.content_html) {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = item.content_html;
+            const imgEl = tmp.querySelector('img');
+            if (imgEl) image = imgEl.src;
+        }
+
+        const ts = item.date_published || item.timestamp || null;
+        const date = ts ? new Date(typeof ts === 'number' ? ts * 1000 : ts) : null;
+
+        return { text, image, date, url: item.url || ('https://www.facebook.com/' + PAGE_ID) };
+    }
+
+    // ─── Build slides ───
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function formatDate(d) {
+        if (!d || isNaN(d)) return '';
+        return MONTH_SHORT[d.getMonth()] + ' ' + d.getDate() + ' d.';
+    }
+
+    function buildSlide(post) {
+        const slide = document.createElement('div');
+        slide.className = 'slide';
+
+        const dateChip = post.date
+            ? '<span class="slide-date-chip">📅 ' + formatDate(post.date) + '</span>'
+            : '';
+
+        if (post.image) {
+            slide.innerHTML =
+                '<div class="slide-image-wrap">' +
+                    '<img class="slide-image" src="' + escapeHtml(post.image) + '" alt="" onerror="this.parentElement.style.display=\'none\'">' +
+                '</div>' +
+                '<div class="slide-content">' +
+                    '<div class="slide-meta">' + dateChip + '</div>' +
+                    '<div class="slide-text">' + escapeHtml(post.text) + '</div>' +
+                '</div>';
+        } else {
+            slide.innerHTML =
+                '<div class="slide-textonly">' +
+                    '<div class="big-quote">“</div>' +
+                    '<div class="slide-text">' + escapeHtml(post.text) + '</div>' +
+                    '<div class="slide-meta">' + dateChip + '</div>' +
+                '</div>';
+        }
+        return slide;
+    }
+
+    // ─── Slideshow engine ───
+    let slides = [];
+    let current = -1;
+    let timer = null;
+    let progressTimer = null;
+    let progressStart = 0;
+
+    function buildDots() {
+        const container = document.getElementById('dots');
+        container.innerHTML = '';
+        slides.forEach((_, i) => {
+            const d = document.createElement('div');
+            d.className = 'dot';
+            container.appendChild(d);
+        });
+        document.getElementById('slideTotal').textContent = String(slides.length).padStart(2, '0');
+    }
+
+    function updateHud() {
+        document.getElementById('slideNum').textContent = String(current + 1).padStart(2, '0');
+        document.querySelectorAll('.dot').forEach((d, i) => {
+            d.classList.toggle('active', i === current);
+        });
+    }
+
+    function advance() {
+        if (!slides.length) return;
+        current = (current + 1) % slides.length;
+
+        slides.forEach((s, i) => s.classList.toggle('active', i === current));
+        updateHud();
+
+        progressStart = Date.now();
+        clearInterval(progressTimer);
+        progressTimer = setInterval(() => {
+            const pct = Math.min(100, ((Date.now() - progressStart) / (DELAY_SECONDS * 1000)) * 100);
+            document.getElementById('progressFill').style.width = pct + '%';
+        }, 200);
+
+        clearTimeout(timer);
+        timer = setTimeout(advance, DELAY_SECONDS * 1000);
+    }
+
+    // ─── Fallback: embedded Facebook page plugin ───
+    function showFallback() {
+        const url = 'https://www.facebook.com/plugins/page.php?href=' +
+            encodeURIComponent('https://www.facebook.com/' + PAGE_ID) +
+            '&tabs=timeline&width=900&height=1300&small_header=true&adapt_container_width=true&hide_cover=false&show_facepile=false';
+        document.getElementById('fallbackIframe').src = url;
+        document.getElementById('fallbackFrame').classList.add('visible');
+        document.getElementById('loadingScreen').classList.add('hidden');
+    }
+
+    // ─── Init ───
+    async function init() {
+        const items = await fetchPosts();
+
+        if (!items) {
+            showFallback();
+            return;
+        }
+
+        const posts = items.map(parseItem);
+        const stage = document.getElementById('stage');
+        posts.forEach(p => {
+            const s = buildSlide(p);
+            stage.appendChild(s);
+            slides.push(s);
+        });
+
+        buildDots();
+        document.getElementById('loadingScreen').classList.add('hidden');
+        advance();
+    }
+
+    init();
+})();
+</script>
+</body>
+</html>

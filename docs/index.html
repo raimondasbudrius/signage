@@ -119,62 +119,6 @@
             transform: scale(1.3);
         }
 
-        /* ─── Facebook Page Plugin View ─── */
-        .fb-plugin-view {
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 80px 40px 40px;
-            overflow: hidden;
-        }
-
-        .fb-plugin-header {
-            text-align: center;
-            margin-bottom: 24px;
-        }
-
-        .fb-plugin-header h2 {
-            font-size: 2rem;
-            font-weight: 900;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-        }
-
-        .fb-plugin-header .fb-icon {
-            width: 40px;
-            height: 40px;
-            background: #1877f2;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.4rem;
-            font-weight: 900;
-        }
-
-        .fb-plugin-container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            max-width: 900px;
-            background: white;
-            border-radius: 16px;
-            overflow: hidden;
-        }
-
-        .fb-plugin-container iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
 
         /* ─── Idle / No Schedule Screen ─── */
         .idle-screen {
@@ -283,14 +227,7 @@
 
     <!-- Source: Facebook -->
     <div class="source-container" id="src-facebook">
-        <div class="fb-plugin-view">
-            <div class="fb-plugin-header">
-                <h2><span class="fb-icon">f</span> Naujienos iš Facebook</h2>
-            </div>
-            <div class="fb-plugin-container">
-                <iframe id="iframe-facebook" src="about:blank"></iframe>
-            </div>
-        </div>
+        <iframe id="iframe-facebook" src="about:blank"></iframe>
     </div>
 
     <!-- Idle Screen -->
@@ -413,13 +350,13 @@
                 slidesUrl = `https://docs.google.com/presentation/d/${slidesId}/embed?start=true&loop=true&delayms=5000`;
             }
 
-            // Facebook Page Plugin URL
+            // Facebook slideshow page URL
             const fbPageId = config.facebook_page_id || 'Mokykla.Moletai';
-            const fbPluginUrl = `https://www.facebook.com/plugins/page.php?href=${encodeURIComponent('https://www.facebook.com/' + fbPageId)}&tabs=timeline&width=800&height=600&small_header=true&adapt_container_width=true&hide_cover=false&show_facepile=false`;
+            const fbSlideshowUrl = `facebook.html?page=${encodeURIComponent(fbPageId)}&delay=12&limit=8`;
 
             document.getElementById('iframe-tvarkarastis').src = tvUrl;
             document.getElementById('iframe-slides').src = slidesUrl;
-            document.getElementById('iframe-facebook').src = fbPluginUrl;
+            document.getElementById('iframe-facebook').src = fbSlideshowUrl;
 
             buildActiveSources();
             document.getElementById('loadingOverlay').classList.add('hidden');
