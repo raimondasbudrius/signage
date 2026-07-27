@@ -356,7 +356,7 @@
             const fbPageId = config.facebook_page_id || 'Mokykla.Moletai';
             const fbLimit = config.facebook_post_limit || '5';
             const basePath = window.location.pathname.replace(/[^/]*$/, '');
-            const fbSlideshowUrl = `${basePath}facebook.html?page=${encodeURIComponent(fbPageId)}&limit=${encodeURIComponent(fbLimit)}`;
+            const fbSlideshowUrl = `${basePath}facebook.html?page=${encodeURIComponent(fbPageId)}&limit=${encodeURIComponent(fbLimit)}&embed=1`;
 
             document.getElementById('iframe-tvarkarastis').src = tvUrl;
             document.getElementById('iframe-slides').src = slidesUrl;

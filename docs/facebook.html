@@ -405,6 +405,11 @@
             letter-spacing: 0.06em;
         }
 
+        /* ─── Embed mode: hide header when embedded in index.html ─── */
+        body.embed .top-bar { display: none; }
+        body.embed .img-counter { top: 24px; }
+        body.embed .post-content { padding-top: 24px; }
+
         /* ─── Loading / error states ─── */
         .state-screen {
             position: fixed;
@@ -529,6 +534,12 @@
     const POST_LIMIT = Math.min(parseInt(params.get('limit')) || 5, 10);
     const POST_DELAY = (parseInt(params.get('delay')) || 15) * 1000; // seconds per post
     const IMAGE_DELAY = 5000; // ms per image within a post
+    const EMBED_MODE = params.get('embed') === '1';
+
+    // Hide header when embedded (index.html shows its own header)
+    if (EMBED_MODE) {
+        document.body.classList.add('embed');
+    }
 
     document.getElementById('pageHandle').textContent = 'facebook.com/' + PAGE_ID;
 
