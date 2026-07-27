@@ -669,7 +669,7 @@
         }
 
         const items = Array.from(doc.querySelectorAll('item'));
-        posts = items.map(parseItem).filter(p => p.title || p.text).slice(0, POST_LIMIT);
+        posts = items.map(parseItem).filter(p => p.title || p.text || p.images.length > 0).slice(0, POST_LIMIT);
 
         if (posts.length === 0) {
             showError();
