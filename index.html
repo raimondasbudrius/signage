@@ -306,8 +306,8 @@
                 // Full URL provided, use it directly
                 slidesUrl = slidesId;
             } else if (slidesId.startsWith('2PACX-')) {
-                // Published presentation ID
-                slidesUrl = `https://docs.google.com/presentation/d/e/${slidesId}/pub?start=true&loop=true&delayms=10000`;
+                // Published presentation ID – use /embed (not /pub, which sets X-Frame-Options: SAMEORIGIN)
+                slidesUrl = `https://docs.google.com/presentation/d/e/${slidesId}/embed?start=true&loop=true&delayms=10000`;
             } else {
                 // Regular presentation ID
                 slidesUrl = `https://docs.google.com/presentation/d/${slidesId}/embed?start=true&loop=true&delayms=10000`;
