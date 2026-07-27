@@ -295,6 +295,7 @@
     let progressStart = 0;
     let progressDuration = 0;
     let slidesUrl = ''; // Stored for background refresh
+    let facebookUrl = ''; // Stored so we can reload FB fresh (starts at post #1)
 
     const DAY_NAMES = ['Sekmadienis', 'Pirmadienis', 'Antradienis', 'Trečiadienis', 'Ketvirtadienis', 'Penktadienis', 'Šeštadienis'];
     const MONTH_NAMES = ['sausio', 'vasario', 'kovo', 'balandžio', 'gegužės', 'birželio', 'liepos', 'rugpjūčio', 'rugsėjo', 'spalio', 'lapkričio', 'gruodžio'];
@@ -357,6 +358,7 @@
             const fbLimit = config.facebook_post_limit || '5';
             const basePath = window.location.pathname.replace(/[^/]*$/, '');
             const fbSlideshowUrl = `${basePath}facebook.html?page=${encodeURIComponent(fbPageId)}&limit=${encodeURIComponent(fbLimit)}&embed=1`;
+            facebookUrl = fbSlideshowUrl;
 
             document.getElementById('iframe-tvarkarastis').src = tvUrl;
             document.getElementById('iframe-slides').src = slidesUrl;
@@ -451,6 +453,17 @@
         currentSourceIndex = (currentSourceIndex + 1) % activeSources.length;
         const entry = activeSources[currentSourceIndex];
 
+        // Always refresh Google Slides right before showing it,
+        // so the latest published content is displayed
+        if (entry.source_type === 'slides') {
+            refreshSlides();
+        }
+
+        // Reload Facebook fresh so the slideshow always starts from post #1
+        if (entry.source_type === 'facebook') {
+            refreshFacebook();
+        }
+
         // Hide all, show current
         document.querySelectorAll('.source-container').forEach(el => el.classList.remove('active'));
         const container = document.getElementById(`src-${entry.source_type}`);
@@ -489,18 +502,41 @@
     setInterval(loadConfig, 5 * 60 * 1000);
 
     // ─── Google Slides Background Refresh ───
-    // Refresh the slides iframe every 5 minutes to pick up content changes
+    // Fully destroy and recreate the slides iframe so the browser is forced
+    // to make a brand-new request (bypasses cached iframe document).
     function refreshSlides() {
-        const iframe = document.getElementById('iframe-slides');
-        if (iframe && slidesUrl) {
-            // Add cache-busting parameter to force reload
-            const separator = slidesUrl.includes('?') ? '&' : '?';
-            iframe.src = slidesUrl + separator + '_t=' + Date.now();
-            console.log('🔄 Google Slides refreshed');
-        }
+        const container = document.getElementById('src-slides');
+        if (!container || !slidesUrl) return;
+
+        const oldIframe = document.getElementById('iframe-slides');
+        if (oldIframe) oldIframe.remove();
+
+        const iframe = document.createElement('iframe');
+        iframe.id = 'iframe-slides';
+        const separator = slidesUrl.includes('?') ? '&' : '?';
+        iframe.src = slidesUrl + separator + '_t=' + Date.now();
+        container.appendChild(iframe);
+        console.log('🔄 Google Slides refreshed (iframe recreated)');
     }
-    // Refresh slides every 5 minutes
+    // Refresh slides every 5 minutes in the background
     setInterval(refreshSlides, 5 * 60 * 1000);
+
+    // ─── Facebook Fresh Reload ───
+    // Recreate the Facebook iframe so the slideshow restarts from post #1
+    function refreshFacebook() {
+        const container = document.getElementById('src-facebook');
+        if (!container || !facebookUrl) return;
+
+        const oldIframe = document.getElementById('iframe-facebook');
+        if (oldIframe) oldIframe.remove();
+
+        const iframe = document.createElement('iframe');
+        iframe.id = 'iframe-facebook';
+        const separator = facebookUrl.includes('?') ? '&' : '?';
+        iframe.src = facebookUrl + separator + '_t=' + Date.now();
+        container.appendChild(iframe);
+        console.log('🔄 Facebook reloaded (starts at post #1)');
+    }
 
     // Listen for localStorage changes (from admin page)
     window.addEventListener('storage', function(e) {
