@@ -189,6 +189,24 @@
             color: #475569;
         }
 
+        /* Image-only post (no title/text): show full image, no cropping */
+        .post-card.image-only .post-image {
+            object-fit: contain;
+            background: #0b1220;
+        }
+
+        .post-card.image-only .post-image-area { background: #0b1220; }
+
+        .post-card.image-only .post-body {
+            max-height: none;
+            flex: 0 0 auto;
+            padding: 14px 32px;
+            display: flex;
+            align-items: center;
+        }
+
+        .post-card.image-only .post-meta { margin-bottom: 0; }
+
         /* Text-only post: centered layout */
         .post-card.text-only .post-image-area { display: none; }
 
@@ -519,7 +537,10 @@
 
         posts.forEach((post, index) => {
             const card = document.createElement('div');
-            card.className = 'post-card' + (post.images.length === 0 ? ' text-only' : '');
+            const isImageOnly = post.images.length > 0 && !post.title && !post.text;
+            card.className = 'post-card'
+                + (post.images.length === 0 ? ' text-only' : '')
+                + (isImageOnly ? ' image-only' : '');
 
             const dateStr = formatDate(post.date);
             const numStr = 'Įrašas ' + (index + 1) + ' / ' + posts.length;
