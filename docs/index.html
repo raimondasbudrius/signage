@@ -294,6 +294,7 @@
     let progressTimer = null;
     let progressStart = 0;
     let progressDuration = 0;
+    let slidesUrl = ''; // Stored for background refresh
 
     const DAY_NAMES = ['Sekmadienis', 'Pirmadienis', 'Antradienis', 'Trečiadienis', 'Ketvirtadienis', 'Penktadienis', 'Šeštadienis'];
     const MONTH_NAMES = ['sausio', 'vasario', 'kovo', 'balandžio', 'gegužės', 'birželio', 'liepos', 'rugpjūčio', 'rugsėjo', 'spalio', 'lapkričio', 'gruodžio'];
@@ -339,7 +340,6 @@
             // Preload iframes
             const tvUrl = config.tvarkarastis_url;
             // Support both regular presentation IDs and published presentation URLs/IDs
-            let slidesUrl;
             const slidesId = config.google_slides_id;
             if (slidesId.startsWith('http')) {
                 // Full URL provided, use it directly
@@ -487,6 +487,20 @@
 
     // Reload config every 5 minutes (to pick up admin changes from localStorage)
     setInterval(loadConfig, 5 * 60 * 1000);
+
+    // ─── Google Slides Background Refresh ───
+    // Refresh the slides iframe every 5 minutes to pick up content changes
+    function refreshSlides() {
+        const iframe = document.getElementById('iframe-slides');
+        if (iframe && slidesUrl) {
+            // Add cache-busting parameter to force reload
+            const separator = slidesUrl.includes('?') ? '&' : '?';
+            iframe.src = slidesUrl + separator + '_t=' + Date.now();
+            console.log('🔄 Google Slides refreshed');
+        }
+    }
+    // Refresh slides every 5 minutes
+    setInterval(refreshSlides, 5 * 60 * 1000);
 
     // Listen for localStorage changes (from admin page)
     window.addEventListener('storage', function(e) {
