@@ -350,9 +350,10 @@
                 slidesUrl = `https://docs.google.com/presentation/d/${slidesId}/embed?start=true&loop=true&delayms=5000`;
             }
 
-            // Facebook slideshow page URL
+            // Facebook slideshow page URL - use absolute path for GitHub Pages
             const fbPageId = config.facebook_page_id || 'Mokykla.Moletai';
-            const fbSlideshowUrl = `facebook.html?page=${encodeURIComponent(fbPageId)}&delay=12&limit=8`;
+            const basePath = window.location.pathname.replace(/[^/]*$/, '');
+            const fbSlideshowUrl = `${basePath}facebook.html?page=${encodeURIComponent(fbPageId)}`;
 
             document.getElementById('iframe-tvarkarastis').src = tvUrl;
             document.getElementById('iframe-slides').src = slidesUrl;

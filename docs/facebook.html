@@ -201,6 +201,8 @@
             z-index: 10;
             padding: 0 64px 72px;
             max-width: 1400px;
+            max-height: 75vh;
+            overflow-y: auto;
             opacity: 0;
             transform: translateY(40px);
             transition: opacity 1s ease, transform 1s cubic-bezier(0.22, 1, 0.36, 1);
@@ -242,14 +244,12 @@
         }
 
         .post-text {
-            font-size: clamp(2rem, 4.2vw, 3.8rem);
+            font-size: clamp(1.4rem, 2.8vw, 2.6rem);
             font-weight: 800;
-            line-height: 1.25;
+            line-height: 1.35;
             text-shadow: 0 3px 24px rgba(0,0,0,0.7);
-            display: -webkit-box;
-            -webkit-line-clamp: 5;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+            max-height: 60vh;
+            overflow-y: auto;
         }
 
         /* Text-only post: giant centered typography */
@@ -291,8 +291,9 @@
         }
 
         .post-textonly .post-text {
-            font-size: clamp(2.4rem, 5vw, 4.6rem);
-            -webkit-line-clamp: 6;
+            font-size: clamp(1.6rem, 3.2vw, 3rem);
+            max-height: 55vh;
+            overflow-y: auto;
         }
 
         .post-textonly .post-meta {
@@ -592,6 +593,7 @@
 
             setTimeout(() => {
                 document.getElementById('postContent').classList.add('visible');
+                autoScrollText(document.getElementById('postText'));
             }, 300);
         } else {
             renderTextOnly(post, dateStr);
@@ -604,6 +606,55 @@
         document.getElementById('postDateTextOnly').textContent = dateStr;
         document.getElementById('postTextBig').innerHTML = escapeHtml(post.text);
         document.getElementById('postTextOnly').classList.add('visible');
+        autoScrollText(document.getElementById('postTextBig'));
+    }
+
+    // Auto-scroll long text to show full content
+    function autoScrollText(el) {
+        if (!el) return;
+        // Reset scroll
+        el.scrollTop = 0;
+        
+        // Check if content overflows
+        setTimeout(() => {
+            if (el.scrollHeight > el.clientHeight) {
+                let scrollPos = 0;
+                const scrollSpeed = 1; // pixels per frame
+                let scrollDirection = 1;
+                let pauseFrames = 0;
+                const PAUSE_AT_ENDS = 120; // frames to pause at top/bottom
+                
+                function scrollStep() {
+                    if (pauseFrames > 0) {
+                        pauseFrames--;
+                        requestAnimationFrame(scrollStep);
+                        return;
+                    }
+                    
+                    scrollPos += scrollSpeed * scrollDirection;
+                    
+                    // Reverse at bottom
+                    if (scrollPos >= el.scrollHeight - el.clientHeight) {
+                        scrollPos = el.scrollHeight - el.clientHeight;
+                        scrollDirection = -1;
+                        pauseFrames = PAUSE_AT_ENDS;
+                    }
+                    // Reverse at top
+                    if (scrollPos <= 0) {
+                        scrollPos = 0;
+                        scrollDirection = 1;
+                        pauseFrames = PAUSE_AT_ENDS;
+                    }
+                    
+                    el.scrollTop = scrollPos;
+                    requestAnimationFrame(scrollStep);
+                }
+                
+                // Start after initial pause
+                pauseFrames = PAUSE_AT_ENDS;
+                requestAnimationFrame(scrollStep);
+            }
+        }, 500);
     }
 
     // ─── Error state with auto-retry ───
