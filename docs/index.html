@@ -368,7 +368,7 @@
 
     const DEFAULT_SETTINGS = {
         tvarkarastis_url: 'https://raimondasbudrius.github.io/tvarkarastis/',
-        google_slides_id: '1HAUtKaTAkO0XrB7OR2e8lEbvcXf_MZYpQgOy-jt0ls8',
+        google_slides_id: '2PACX-1vQJp88eC9zQQGG_6XGfhvz5g5h9BwKuzdRAOi5ntp93DAdeICS-F3DLB9O0zjZSOgqr6rg3SmBn6zN9',
         facebook_page_id: 'Mokykla.Moletai',
         facebook_access_token: '',
         school_name: 'Molėtų progimnazija',
@@ -448,7 +448,19 @@
 
             // Preload iframes
             const tvUrl = config.tvarkarastis_url;
-            const slidesUrl = `https://docs.google.com/presentation/d/${config.google_slides_id}/embed?start=true&loop=true&delayms=5000`;
+            // Support both regular presentation IDs and published presentation URLs/IDs
+            let slidesUrl;
+            const slidesId = config.google_slides_id;
+            if (slidesId.startsWith('http')) {
+                // Full URL provided, use it directly
+                slidesUrl = slidesId;
+            } else if (slidesId.startsWith('2PACX-')) {
+                // Published presentation ID
+                slidesUrl = `https://docs.google.com/presentation/d/e/${slidesId}/pub?start=true&loop=true&delayms=10000`;
+            } else {
+                // Regular presentation ID
+                slidesUrl = `https://docs.google.com/presentation/d/${slidesId}/embed?start=true&loop=true&delayms=5000`;
+            }
 
             document.getElementById('iframe-tvarkarastis').src = tvUrl;
             document.getElementById('iframe-slides').src = slidesUrl;
