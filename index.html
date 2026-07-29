@@ -253,7 +253,7 @@
 
     // ─── State ───
     let config = null;
-    let activeSources = [];
+    let activeSources = null; // null = not yet evaluated (distinct from [] = evaluated, none active)
     let currentSourceIndex = -1;
     let sourceTimer = null;
     let progressTimer = null;
@@ -359,7 +359,7 @@
 
         // Check if the active set changed
         const newKey = matching.map(m => m.id).join(',');
-        const oldKey = activeSources.map(m => m.id).join(',');
+        const oldKey = activeSources === null ? null : activeSources.map(m => m.id).join(',');
 
         if (newKey !== oldKey) {
             activeSources = matching;
