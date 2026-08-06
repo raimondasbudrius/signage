@@ -460,10 +460,19 @@
         const descEl = item.querySelector('description');
         const descHtml = descEl ? descEl.textContent : '';
 
-        let text = '';
+        // Parse description once and strip the "Feed generated with FetchRSS" watermark
+        let descNode = null;
         if (descHtml) {
-            const tmp = document.createElement('div');
-            tmp.innerHTML = descHtml;
+            descNode = document.createElement('div');
+            descNode.innerHTML = descHtml;
+            descNode.querySelectorAll('span').forEach(span => {
+                if (/feed generated/i.test(span.textContent)) span.remove();
+            });
+        }
+
+        let text = '';
+        if (descNode) {
+            const tmp = descNode.cloneNode(true);
             tmp.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
             text = tmp.textContent || '';
         }
@@ -487,10 +496,8 @@
             }
         }
 
-        if (descHtml) {
-            const tmp = document.createElement('div');
-            tmp.innerHTML = descHtml;
-            tmp.querySelectorAll('img').forEach(img => addImage(img.getAttribute('src')));
+        if (descNode) {
+            descNode.querySelectorAll('img').forEach(img => addImage(img.getAttribute('src')));
         }
 
         Array.from(item.getElementsByTagName('media:content')).forEach(mc => {
@@ -675,6 +682,41 @@
         postTimer = setInterval(advancePost, POST_DELAY);
     }
 
+    // ─── Seamless refresh helpers ───
+    function postSignature(p) {
+        return [p.title, p.text, p.images.join('|'), p.date ? p.date.getTime() : ''].join('\u0001');
+    }
+
+    function preloadImage(url) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(url);
+            img.onerror = () => reject(new Error('image load failed'));
+            img.src = url;
+        });
+    }
+
+    async function swapSlideshow() {
+        const keepIndex = Math.min(currentPost, posts.length - 1);
+
+        // Preload the image that will be visible right after the swap to avoid flashing
+        if (posts[keepIndex].images.length > 0) {
+            try { await preloadImage(posts[keepIndex].images[0]); } catch (e) { /* ignore */ }
+        }
+
+        clearInterval(postTimer);
+        clearInterval(imageTimer);
+        currentImage = 0;
+
+        buildPostCards();
+        buildDots();
+        currentPost = keepIndex;
+        renderPost(keepIndex);
+
+        clearTimeout(postTimer);
+        postTimer = setInterval(advancePost, POST_DELAY);
+    }
+
     function showError() {
         document.getElementById('loadingSub').textContent = 'Nepavyko gauti įrašų';
         document.querySelector('.retry-note').textContent = 'Bandoma dar kartą po 60 sekundžių…';
@@ -690,19 +732,33 @@
         }
 
         const items = Array.from(doc.querySelectorAll('item'));
-        posts = items.map(parseItem).filter(p => p.title || p.text || p.images.length > 0).slice(0, POST_LIMIT);
+        const newPosts = items.map(parseItem).filter(p => p.title || p.text || p.images.length > 0).slice(0, POST_LIMIT);
 
-        if (posts.length === 0) {
+        if (newPosts.length === 0) {
             showError();
             return;
         }
 
-        if (currentPost === -1 || posts.length !== postCards.length) {
+        // First load – start slideshow
+        if (currentPost === -1 || posts.length === 0) {
+            posts = newPosts;
             clearInterval(postTimer);
             clearInterval(imageTimer);
             currentPost = -1;
             startSlideshow();
+            return;
         }
+
+        // Refresh: compare content signatures; if nothing changed, keep showing
+        // the current posts without any rebuild or visual refresh
+        const changed = newPosts.length !== posts.length ||
+            newPosts.some((p, i) => postSignature(p) !== postSignature(posts[i]));
+
+        if (!changed) return;
+
+        // Content changed – swap seamlessly (old posts stay visible until swap is ready)
+        posts = newPosts;
+        await swapSlideshow();
     }
 
     init();
