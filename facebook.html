@@ -403,13 +403,78 @@
     updateClock();
 
     // ─── RSS feed from fetchrss.com ───
-    const RSS_FEED_URL = 'https://fetchrss.com/feed/1wrrGh2Ku0FY1wrrH50NEDWU.rss';
+    const RSS_FEED_URL = 'https://fetchrss.com/feed/1wrrGh2Ku0FY1wtKxY8xMCl0.rss';
 
     const CORS_PROXIES = [
         url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
         url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
         url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url)
     ];
+
+    // ─── Translation (English → Lithuanian) ───
+    // Primary: Google Translate (gtx) endpoint; fallback: MyMemory free API.
+    // Results are cached so repeated refreshes don't re-translate the same text.
+    const translationCache = new Map();
+
+    function fetchWithTimeout(url, ms, options) {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), ms);
+        return fetch(url, Object.assign({ signal: ctrl.signal }, options || {}))
+            .finally(() => clearTimeout(t));
+    }
+
+    async function translateViaGoogle(text) {
+        const res = await fetchWithTimeout(
+            'https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=lt&dt=t',
+            8000,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                body: 'q=' + encodeURIComponent(text)
+            }
+        );
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const out = (Array.isArray(data) && Array.isArray(data[0]) ? data[0] : [])
+            .map(seg => (seg && typeof seg[0] === 'string') ? seg[0] : '')
+            .join('');
+        if (!out) throw new Error('empty translation');
+        return out;
+    }
+
+    async function translateViaMyMemory(text) {
+        const url = 'https://api.mymemory.translated.net/get?q=' +
+            encodeURIComponent(text.slice(0, 500)) + '&langpair=en|lt';
+        const res = await fetchWithTimeout(url, 8000);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const translated = data && data.responseData ? data.responseData.translatedText : '';
+        if (!translated || data.responseStatus !== 200) throw new Error('bad response');
+        return translated;
+    }
+
+    async function translateText(text) {
+        if (!text || text.trim().length === 0) return text;
+        if (translationCache.has(text)) return translationCache.get(text);
+
+        try {
+            const translated = await translateViaGoogle(text);
+            translationCache.set(text, translated);
+            return translated;
+        } catch (e) {
+            console.warn('Google translation failed:', e.message);
+        }
+
+        try {
+            const translated = await translateViaMyMemory(text);
+            translationCache.set(text, translated);
+            return translated;
+        } catch (e) {
+            console.warn('MyMemory translation failed:', e.message);
+        }
+
+        return text;
+    }
 
     async function fetchXmlWithTimeout(url, ms) {
         const ctrl = new AbortController();
@@ -526,6 +591,15 @@
     function formatDate(d) {
         if (!d || isNaN(d)) return 'Šiandien';
         return MONTH_SHORT[d.getMonth()] + ' ' + d.getDate() + ' d.';
+    }
+
+    // ─── Translate post content ───
+    async function translatePost(post) {
+        const [title, text] = await Promise.all([
+            translateText(post.title),
+            translateText(post.text)
+        ]);
+        return { ...post, title, text };
     }
 
     // ─── Slideshow state ───
@@ -732,7 +806,11 @@
         }
 
         const items = Array.from(doc.querySelectorAll('item'));
-        const newPosts = items.map(parseItem).filter(p => p.title || p.text || p.images.length > 0).slice(0, POST_LIMIT);
+        let newPosts = items.map(parseItem).filter(p => p.title || p.text || p.images.length > 0).slice(0, POST_LIMIT);
+
+        // Translate all posts from English to Lithuanian
+        document.getElementById('loadingSub').textContent = 'Verčiama į lietuvių kalbą…';
+        newPosts = await Promise.all(newPosts.map(translatePost));
 
         if (newPosts.length === 0) {
             showError();
