@@ -260,7 +260,7 @@
     let progressStart = 0;
     let progressDuration = 0;
     let slidesUrl = ''; // Stored for background refresh
-    let facebookUrl = ''; // Stored so we can reload FB fresh (starts at post #1)
+    let facebookUrl = ''; // Stored for background loading / restart messaging
 
     const DAY_NAMES = ['Sekmadienis', 'Pirmadienis', 'Antradienis', 'Trečiadienis', 'Ketvirtadienis', 'Penktadienis', 'Šeštadienis'];
     const MONTH_NAMES = ['sausio', 'vasario', 'kovo', 'balandžio', 'gegužės', 'birželio', 'liepos', 'rugpjūčio', 'rugsėjo', 'spalio', 'lapkričio', 'gruodžio'];
@@ -322,7 +322,17 @@
 
             document.getElementById('iframe-tvarkarastis').src = tvUrl;
             document.getElementById('iframe-slides').src = slidesUrl;
-            document.getElementById('iframe-facebook').src = fbSlideshowUrl;
+
+            // The Facebook iframe is loaded once and then kept alive in the
+            // background (it refreshes its posts internally every 5 minutes).
+            // Only (re)load it when the URL actually changed (admin settings),
+            // so the periodic config refresh doesn't restart the Facebook
+            // slideshow and show the loading screen to viewers.
+            const fbIframe = document.getElementById('iframe-facebook');
+            if (fbIframe.dataset.loadedUrl !== fbSlideshowUrl) {
+                fbIframe.src = fbSlideshowUrl;
+                fbIframe.dataset.loadedUrl = fbSlideshowUrl;
+            }
 
             buildActiveSources();
             document.getElementById('loadingOverlay').classList.add('hidden');
@@ -429,7 +439,8 @@
             refreshSlides();
         }
 
-        // Reload Facebook fresh so the slideshow always starts from post #1
+        // Restart the Facebook slideshow from post #1 (no reload – the iframe
+        // has been loading/refreshing in the background the whole time)
         if (entry.source_type === 'facebook') {
             refreshFacebook();
         }
@@ -491,21 +502,36 @@
     // Refresh slides every 5 minutes in the background
     setInterval(refreshSlides, 5 * 60 * 1000);
 
-    // ─── Facebook Fresh Reload ───
-    // Recreate the Facebook iframe so the slideshow restarts from post #1
+    // ─── Facebook Fresh Start ───
+    // The Facebook iframe is loaded once (in loadConfig) and stays alive in
+    // the background the whole time, refreshing its posts internally, so the
+    // content is ready the moment it's Facebook's turn to be shown.
+    // Here we only ask it (via postMessage) to restart the slideshow from
+    // post #1 – no reload, so viewers never see a loading screen.
     function refreshFacebook() {
         const container = document.getElementById('src-facebook');
         if (!container || !facebookUrl) return;
 
-        const oldIframe = document.getElementById('iframe-facebook');
-        if (oldIframe) oldIframe.remove();
+        let iframe = document.getElementById('iframe-facebook');
 
-        const iframe = document.createElement('iframe');
-        iframe.id = 'iframe-facebook';
-        const separator = facebookUrl.includes('?') ? '&' : '?';
-        iframe.src = facebookUrl + separator + '_t=' + Date.now();
-        container.appendChild(iframe);
-        console.log('🔄 Facebook reloaded (starts at post #1)');
+        // Safety: if the iframe is missing or was never loaded, load it now
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = 'iframe-facebook';
+            container.appendChild(iframe);
+        }
+        if (iframe.dataset.loadedUrl !== facebookUrl) {
+            iframe.src = facebookUrl;
+            iframe.dataset.loadedUrl = facebookUrl;
+            return; // will start from post #1 automatically once loaded
+        }
+
+        try {
+            iframe.contentWindow.postMessage({ type: 'signage:restart' }, '*');
+            console.log('🔄 Facebook slideshow restarted from post #1 (no reload)');
+        } catch (e) {
+            console.warn('Facebook restart message failed:', e.message);
+        }
     }
 
     // Listen for localStorage changes (from admin page)

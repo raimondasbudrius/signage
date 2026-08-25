@@ -314,23 +314,12 @@
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .state-msg {
-            margin-top: 24px;
-            font-weight: 700;
-            font-size: 1.1rem;
-            color: #1e293b;
-        }
-
-        .state-sub {
-            margin-top: 10px;
-            font-size: 0.9rem;
-            color: #64748b;
-        }
-
+        /* Loading status text is hidden from viewers
+           (elements are kept in the DOM for debugging) */
+        .state-msg,
+        .state-sub,
         .retry-note {
-            margin-top: 20px;
-            font-size: 0.8rem;
-            color: #94a3b8;
+            display: none;
         }
     </style>
 </head>
@@ -476,6 +465,14 @@
         return text;
     }
 
+    // Status text is intentionally hidden from viewers – it is only logged
+    // to the browser console for debugging.
+    function setLoadingStatus(text) {
+        console.log('[facebook] ' + text);
+        const el = document.getElementById('loadingSub');
+        if (el) el.textContent = text;
+    }
+
     async function fetchXmlWithTimeout(url, ms) {
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), ms);
@@ -491,7 +488,7 @@
 
     async function fetchFeed() {
         try {
-            document.getElementById('loadingSub').textContent = 'Bandoma tiesiogiai…';
+            setLoadingStatus('Bandoma tiesiogiai…');
             const doc = await fetchXmlWithTimeout(RSS_FEED_URL, 10000);
             if (doc.querySelector('item')) return doc;
         } catch (e) {
@@ -502,7 +499,7 @@
             try {
                 const proxyUrl = proxy(RSS_FEED_URL);
                 const proxyHost = proxyUrl.split('://')[1]?.split('/')[0] || 'proxy';
-                document.getElementById('loadingSub').textContent = 'Bandoma: ' + proxyHost;
+                setLoadingStatus('Bandoma: ' + proxyHost);
                 const doc = await fetchXmlWithTimeout(proxyUrl, 12000);
                 if (doc.querySelector('parsererror')) throw new Error('XML parse error');
                 if (doc.querySelector('item')) {
@@ -792,8 +789,7 @@
     }
 
     function showError() {
-        document.getElementById('loadingSub').textContent = 'Nepavyko gauti įrašų';
-        document.querySelector('.retry-note').textContent = 'Bandoma dar kartą po 60 sekundžių…';
+        setLoadingStatus('Nepavyko gauti įrašų – bandoma dar kartą po 60 sekundžių');
         setTimeout(init, 60000);
     }
 
@@ -809,7 +805,7 @@
         let newPosts = items.map(parseItem).filter(p => p.title || p.text || p.images.length > 0).slice(0, POST_LIMIT);
 
         // Translate all posts from English to Lithuanian
-        document.getElementById('loadingSub').textContent = 'Verčiama į lietuvių kalbą…';
+        setLoadingStatus('Verčiama į lietuvių kalbą…');
         newPosts = await Promise.all(newPosts.map(translatePost));
 
         if (newPosts.length === 0) {
@@ -842,6 +838,22 @@
     init();
 
     setInterval(init, 5 * 60 * 1000);
+
+    // ─── Restart request from the signage player (index.html) ───
+    // The iframe stays loaded in the background the whole time; the parent
+    // only asks to restart the slideshow from post #1 without reloading the
+    // page, so viewers never see a loading screen.
+    window.addEventListener('message', function(e) {
+        if (!e.data || e.data.type !== 'signage:restart') return;
+        if (posts.length === 0) return; // still loading – will start at #1 anyway
+        clearInterval(postTimer);
+        clearInterval(imageTimer);
+        currentImage = 0;
+        currentPost = -1;
+        advancePost();
+        clearTimeout(postTimer);
+        postTimer = setInterval(advancePost, POST_DELAY);
+    });
 })();
 </script>
 </body>
