@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script>
+// Seed signage config BEFORE the signage page loads: point tvarkarastis at the
+// same-origin local copy (simulates raimondasbudrius.github.io deployment)
+localStorage.setItem('signage_settings', JSON.stringify({
+    tvarkarastis_url: 'http://127.0.0.1:8123/tvarkarastis/',
+    google_slides_id: '',
+    facebook_page_id: '',
+    facebook_access_token: '',
+    facebook_post_limit: '5',
+    school_name: 'Test School',
+    transition_seconds: '300'
+}));
+localStorage.setItem('signage_schedule', JSON.stringify([
+    { id: 1, name: 'Tvarkaraštis', source_type: 'tvarkarastis', start_time: '00:00', end_time: '23:59', duration_seconds: 3600, days: '0,1,2,3,4,5,6', enabled: 1, sort_order: 1 }
+]));
+</script>
+</head>
+<body style="margin:0">
+<iframe id="sg" src="index.html" style="width:100vw;height:100vh;border:0;display:block"></iframe>
+<pre id="out" style="position:fixed;left:0;top:0;background:white;z-index:99999">PENDING</pre>
+<script>
+function check() {
+    const out = document.getElementById('out');
+    try {
+        const doc = document.getElementById('sg').contentDocument;
+        if (!doc) { out.textContent = 'RESULT_ERROR: signage frame not accessible'; return; }
+        const tv = doc.getElementById('iframe-tvarkarastis');
+        const tvDoc = tv && tv.contentDocument;
+        if (!tvDoc || !tvDoc.body || tvDoc.readyState !== 'complete') {
+            out.textContent = 'RESULT_ERROR: tvarkarastis iframe not ready (readyState=' + (tvDoc && tvDoc.readyState) + ')';
+            return;
+        }
+        const cs = sel => { const el = tvDoc.querySelector(sel); return el ? getComputedStyle(el).display : 'MISSING'; };
+        const cont = tvDoc.querySelector('.timeline-container');
+        const app = tvDoc.getElementById('app');
+        const table = tvDoc.querySelector('.timeline-table');
+        const r = {
+            iframeSrc: tv.src,
+            styleInjected: !!tvDoc.getElementById('signage-embed-style'),
+            headerBarDisplay: cs('.header-bar'),
+            filterBarDisplay: cs('.filter-bar'),
+            daySelectorDisplay: cs('.day-selector'),
+            legendDisplay: cs('.legend'),
+            appDisplay: app ? getComputedStyle(app).display : 'MISSING',
+            appHeight: app ? app.offsetHeight : -1,
+            containerSize: cont ? cont.offsetWidth + 'x' + cont.offsetHeight : 'MISSING',
+            tableSize: table ? Math.round(table.getBoundingClientRect().width) + 'x' + Math.round(table.getBoundingClientRect().height) : 'MISSING',
+            tableZoom: table ? (table.style.zoom || '1') : 'MISSING',
+            tableFits: (table && cont) ? (Math.round(table.getBoundingClientRect().height) <= cont.offsetHeight + 1) : false,
+            viewport: tvDoc.defaultView.innerWidth + 'x' + tvDoc.defaultView.innerHeight,
+            bodyPadding: getComputedStyle(tvDoc.body).padding,
+            tableRows: tvDoc.querySelectorAll('#timelineBody tr').length,
+            lessonCells: tvDoc.querySelectorAll('#timelineBody td.lesson-cell').length,
+            firstRowVisible: (function () {
+                const lastRow = tvDoc.querySelector('#timelineBody tr:last-child');
+                return lastRow ? Math.round(lastRow.getBoundingClientRect().bottom) : -1;
+            })(),
+            errorVisible: tvDoc.getElementById('error-container') ? getComputedStyle(tvDoc.getElementById('error-container')).display : 'MISSING',
+            autoFitInstalled: !!(tvDoc.defaultView && tvDoc.defaultView.__signageAutoFitInstalled),
+            tableStyleCss: table ? table.style.cssText : 'MISSING',
+            fitLog: (tvDoc.defaultView && tvDoc.defaultView.__signageFitLog) ? tvDoc.defaultView.__signageFitLog.slice(-8) : 'MISSING'
+        };
+        out.textContent = 'RESULT_JSON: ' + JSON.stringify(r);
+    } catch (e) {
+        out.textContent = 'RESULT_ERROR: ' + e.message;
+    }
+}
+setTimeout(check, 25000);
+</script>
+</body>
+</html>

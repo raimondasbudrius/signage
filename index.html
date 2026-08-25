@@ -320,9 +320,14 @@
             const fbSlideshowUrl = `${basePath}facebook.html?page=${encodeURIComponent(fbPageId)}&limit=${encodeURIComponent(fbLimit)}&embed=1`;
             facebookUrl = fbSlideshowUrl;
 
-            document.getElementById('iframe-tvarkarastis').src = tvUrl;
+            // Tvarkarastis gets ?embed=1 (same convention as facebook.html) and
+            // the signage embed CSS is injected into its iframe document
+            const tvSeparator = tvUrl.includes('?') ? '&' : '?';
+            document.getElementById('iframe-tvarkarastis').src = tvUrl + tvSeparator + 'embed=1';
             document.getElementById('iframe-slides').src = slidesUrl;
             document.getElementById('iframe-facebook').src = fbSlideshowUrl;
+
+            applyTvarkarastisEmbedStyle();
 
             buildActiveSources();
             document.getElementById('loadingOverlay').classList.add('hidden');
@@ -507,6 +512,227 @@
         container.appendChild(iframe);
         console.log('🔄 Facebook reloaded (starts at post #1)');
     }
+
+    // ─── Tvarkarastis Embed Mode ───
+    // On the signage display the tvarkarastis source must show ONLY the
+    // fullscreen timetable table (class column + full day of lessons) —
+    // no header, no filters, no day selector, no legend.
+    // The standalone tvarkarastis project stays untouched, so the styles are
+    // injected directly into the iframe's own document (same-origin GitHub
+    // Pages). Re-applied on every iframe (re)load.
+    const TV_EMBED_STYLE_ID = 'signage-embed-style';
+
+    const TVARKARASTIS_EMBED_CSS = `
+        html, body {
+            margin: 0 !important;
+            height: 100% !important;
+            overflow: hidden !important;
+        }
+
+        /* Leave room for the signage top-bar / progress-bar / source dots */
+        body { padding: 70px 12px 32px 12px !important; }
+
+        /* Hide the standalone page UI */
+        .header-bar,
+        .filter-bar,
+        .day-selector,
+        .legend { display: none !important; }
+
+        #app { height: 100% !important; }
+
+        /* Fullscreen timetable */
+        .timeline-container {
+            height: 100% !important;
+            width: 100% !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            overflow: hidden !important;
+            padding: 0 !important;
+        }
+
+        /* Note: width/height must NOT be !important — they are managed by the
+           auto-fit script below */
+        .timeline-table {
+            height: 100%;
+            width: 100%;
+            min-width: 0 !important;
+            font-size: clamp(11px, 1.7vh, 18px) !important;
+        }
+
+        .timeline-table th { padding: clamp(4px, 0.8vh, 10px) 4px !important; }
+        .period-header .period-num   { font-size: clamp(14px, 2.6vh, 28px) !important; }
+        .period-header .period-time  { font-size: clamp(10px, 1.8vh, 19px) !important; }
+        .period-header .period-break { font-size: clamp(9px, 1.5vh, 16px) !important; }
+
+        .timeline-table td {
+            min-width: 0 !important;
+            max-width: none !important;
+            padding: clamp(2px, 0.4vh, 6px) !important;
+        }
+
+        .class-row td:first-child {
+            font-size: clamp(16px, 3vh, 34px) !important;
+            width: clamp(48px, 5vw, 90px) !important;
+            min-width: clamp(48px, 5vw, 90px) !important;
+            max-width: clamp(48px, 5vw, 90px) !important;
+        }
+
+        .lesson-info { line-height: 1.22 !important; }
+        .lesson-info > div:first-child { font-size: clamp(12px, 2vh, 22px) !important; }
+        .lesson-info > div:last-child  { font-size: clamp(10px, 1.8vh, 20px) !important; }
+
+        .lesson-class { font-size: clamp(12px, 2vh, 22px) !important; }
+        .room-badge, .split-badge { font-size: clamp(9px, 1.4vh, 15px) !important; }
+        .break-indicator { font-size: clamp(11px, 1.9vh, 20px) !important; }
+        .break-indicator span { font-size: clamp(9px, 1.5vh, 16px) !important; }
+        .no-lesson { font-size: clamp(10px, 1.7vh, 18px) !important; }
+    `;
+
+    // Auto-fit: scales the table (CSS zoom) so the WHOLE timetable is always
+    // visible on screen, no matter how many lessons each class has that day.
+    // Re-runs whenever tvarkarastis re-renders (its own 1-min / 10-min timers).
+    const TVARKARASTIS_EMBED_JS = `
+(function () {
+    if (window.__signageAutoFitInstalled) return;
+    window.__signageAutoFitInstalled = true;
+    window.__signageFitLog = [];
+
+    function log(msg) {
+        try {
+            window.__signageFitLog.push(String(msg));
+            if (window.__signageFitLog.length > 50) window.__signageFitLog.shift();
+        } catch (e) {}
+    }
+
+    // Throttle: run at most ~10 fits/sec; coalesce bursts via setTimeout
+    // (no requestAnimationFrame — it is not reliable in all headless contexts)
+    var lastFit = 0;
+    var pendingTimer = null;
+
+    function runFit(reason) {
+        lastFit = Date.now();
+        try {
+            fitTable(reason);
+        } catch (e) {
+            log('ERR ' + (e && e.message));
+        }
+    }
+
+    function requestFit(reason) {
+        if (Date.now() - lastFit >= 100) {
+            runFit(reason);
+            return;
+        }
+        if (pendingTimer !== null) return;
+        pendingTimer = setTimeout(function () {
+            pendingTimer = null;
+            runFit(reason);
+        }, 120);
+    }
+
+    function rectH(el) {
+        return el ? el.getBoundingClientRect().height : 0;
+    }
+
+    function fitTable(reason) {
+        var table = document.getElementById('timelineTable');
+        var container = document.querySelector('.timeline-container');
+        var appEl = document.getElementById('app');
+        if (!table || !container || !appEl || appEl.style.display === 'none') {
+            log(reason + ': skip (app hidden or missing)');
+            return;
+        }
+
+        var availW = container.clientWidth;
+        var availH = container.clientHeight;
+        if (availW <= 0 || availH <= 0) {
+            log(reason + ': skip (container ' + availW + 'x' + availH + ')');
+            return;
+        }
+
+        // Iteratively find the largest zoom (max 1) at which the table content
+        // fits the available height (wider table = fewer wrapped lines).
+        // NOTE: measure the TABLE element itself — thead/tbody rects are
+        // unreliable (Chrome returns empty rects for table sections).
+        var s = 1;
+        for (var i = 0; i < 4; i++) {
+            // Reset inline sizing so we measure the natural content height
+            // (CSS height:100% keeps the table at least as tall as the screen)
+            table.style.zoom = '';
+            table.style.height = '';
+            table.style.width = (100 / s) + '%';
+            var contentH = rectH(table);
+            if (contentH <= 0) {
+                log(reason + ': skip (contentH=0)');
+                return;
+            }
+            var sNew = Math.min(1, availH / contentH);
+            if (Math.abs(sNew - s) < 0.01) { s = sNew; break; }
+            s = sNew;
+        }
+        table.style.zoom = s.toFixed(4);
+        table.style.width = (100 / s) + '%';
+        table.style.height = (availH / s) + 'px';
+        log(reason + ': avail=' + availW + 'x' + availH + ' zoom=' + s.toFixed(4));
+    }
+
+    function watch() {
+        var table = document.getElementById('timelineTable');
+        var appEl = document.getElementById('app');
+        if (table) {
+            new MutationObserver(function () { requestFit('table-mut'); }).observe(table, { childList: true, subtree: true, characterData: true });
+        }
+        if (appEl) {
+            new MutationObserver(function () { requestFit('app-mut'); }).observe(appEl, { attributes: true, attributeFilter: ['style'] });
+        }
+        window.addEventListener('resize', function () { requestFit('resize'); });
+        // Safety net: re-fit periodically (covers any missed mutations)
+        setInterval(function () { requestFit('interval'); }, 2000);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () { watch(); requestFit('dcl'); });
+    } else {
+        watch();
+        requestFit('inject');
+    }
+
+    // Re-fit once web fonts finish loading (row heights can change)
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function () { requestFit('fonts'); }, function () {});
+    }
+    window.addEventListener('load', function () { requestFit('load'); });
+})();
+`;
+
+    function applyTvarkarastisEmbedStyle() {
+        const iframe = document.getElementById('iframe-tvarkarastis');
+        if (!iframe) return;
+
+        let doc = null;
+        try {
+            doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+        } catch (err) {
+            console.warn('⚠️ Tvarkarastis iframe not accessible (different domain?) — embed style not applied:', err.message);
+            return;
+        }
+        if (!doc || !doc.documentElement) return;
+        if (doc.getElementById(TV_EMBED_STYLE_ID)) return; // already applied
+
+        const style = doc.createElement('style');
+        style.id = TV_EMBED_STYLE_ID;
+        style.textContent = TVARKARASTIS_EMBED_CSS;
+        (doc.head || doc.documentElement).appendChild(style);
+
+        const script = doc.createElement('script');
+        script.textContent = TVARKARASTIS_EMBED_JS;
+        (doc.head || doc.documentElement).appendChild(script);
+
+        console.log('🖥️ Tvarkarastis embed style applied (fullscreen timetable)');
+    }
+
+    // Re-apply the embed style every time the tvarkarastis iframe (re)loads
+    document.getElementById('iframe-tvarkarastis').addEventListener('load', applyTvarkarastisEmbedStyle);
 
     // Listen for localStorage changes (from admin page)
     window.addEventListener('storage', function(e) {
