@@ -407,11 +407,108 @@
     // ─── RSS feed from fetchrss.com ───
     const RSS_FEED_URL = 'https://fetchrss.com/feed/1wyQIa8hjC5i1wyQIj2yO3pk.rss';
 
-    const CORS_PROXIES = [
-        url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
-        url => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
-        url => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url)
+    // Feed šaltinių grandinė: kiekviena strategija grąžina įrašų masyvą
+    // ({ title, text, images, date }). Vieši CORS proxy dažnai genda arba
+    // pradeda reikalauti API raktų, todėl turime kelis skirtingus šaltinius
+    // + vietinį feed-cache.xml (tas pats GitHub Pages, be CORS) + localStorage.
+    async function fetchText(url, ms) {
+        const res = await fetchWithTimeout(url, ms);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return await res.text();
+    }
+
+    function xmlToPosts(xmlText) {
+        const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+        if (doc.querySelector('parsererror')) throw new Error('XML parse error');
+        const items = Array.from(doc.querySelectorAll('item'));
+        if (!items.length) throw new Error('no items');
+        return items.map(parseItem).filter(p => p.title || p.text || p.images.length > 0);
+    }
+
+    // rss2json.com grąžina feed kaip JSON (CORS: Access-Control-Allow-Origin: *)
+    function rss2jsonToPosts(data) {
+        if (!data || data.status !== 'ok' || !Array.isArray(data.items) || !data.items.length) {
+            throw new Error('bad rss2json response');
+        }
+        return data.items.map(it => {
+            const holder = document.createElement('div');
+            holder.innerHTML = it.description || it.content || '';
+            holder.querySelectorAll('span').forEach(span => {
+                if (/feed generated/i.test(span.textContent)) span.remove();
+            });
+            const tmp = holder.cloneNode(true);
+            tmp.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+            let text = (tmp.textContent || '').replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n').trim();
+
+            let title = (it.title || '').trim().replace(/\.\.\.$/, '').replace(/\s+Posted$/, '').trim();
+            if (!text.trim() || text.trim() === title) text = '';
+
+            const images = [];
+            const seen = new Set();
+            const addImage = url => {
+                if (!url) return;
+                const ampEntity = String.fromCharCode(38) + 'amp;';
+                const decoded = url.split(ampEntity).join(String.fromCharCode(38));
+                const key = decoded.split('?')[0];
+                if (!seen.has(key)) { seen.add(key); images.push(decoded); }
+            };
+            if (it.enclosure && it.enclosure.link) addImage(it.enclosure.link);
+            holder.querySelectorAll('img').forEach(img => addImage(img.getAttribute('src')));
+            if (it.thumbnail) addImage(it.thumbnail);
+
+            let date = null;
+            if (it.pubDate) {
+                date = new Date(it.pubDate + ' UTC');
+                if (isNaN(date.getTime())) date = new Date(it.pubDate);
+                if (isNaN(date.getTime())) date = null;
+            }
+            return { title, text, images, date };
+        }).filter(p => p.title || p.text || p.images.length > 0);
+    }
+
+    const FEED_STRATEGIES = [
+        { name: 'tiesiogiai', run: () => fetchText(RSS_FEED_URL, 10000).then(xmlToPosts) },
+        {
+            name: 'allorigins (get)',
+            run: async () => {
+                const res = await fetchWithTimeout(
+                    'https://api.allorigins.win/get?url=' + encodeURIComponent(RSS_FEED_URL), 15000);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                if (!data || typeof data.contents !== 'string' || !data.contents.trim()) {
+                    throw new Error('empty contents');
+                }
+                return xmlToPosts(data.contents);
+            }
+        },
+        {
+            name: 'rss2json',
+            run: async () => {
+                const res = await fetchWithTimeout(
+                    'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(RSS_FEED_URL), 15000);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return rss2jsonToPosts(await res.json());
+            }
+        },
+        {
+            name: 'allorigins (raw)',
+            run: () => fetchText(
+                'https://api.allorigins.win/raw?url=' + encodeURIComponent(RSS_FEED_URL), 12000).then(xmlToPosts)
+        },
+        {
+            name: 'codetabs',
+            run: () => fetchText(
+                'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(RSS_FEED_URL), 12000).then(xmlToPosts)
+        },
+        {
+            // Statiška feed kopija šiame pačiame repo (GitHub Pages) – CORS neegzistuoja
+            name: 'vietinis feed-cache.xml',
+            run: () => fetchText('feed-cache.xml?ts=' + Date.now(), 8000).then(xmlToPosts)
+        }
     ];
+
+    // Paskutinis sėkmingai gautas feed, kad ekranas niekada neliktų tuščias
+    const FEED_CACHE_KEY = 'signage-fb-feed-cache';
 
     // ─── Translation (English → Lithuanian) ───
     // Primary: Google Translate (gtx) endpoint; fallback: MyMemory free API.
@@ -478,43 +575,35 @@
         return text;
     }
 
-    async function fetchXmlWithTimeout(url, ms) {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), ms);
-        try {
-            const res = await fetch(url, { signal: ctrl.signal });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const text = await res.text();
-            return new DOMParser().parseFromString(text, 'text/xml');
-        } finally {
-            clearTimeout(t);
-        }
-    }
-
     async function fetchFeed() {
-        try {
-            document.getElementById('loadingSub').textContent = 'Bandoma tiesiogiai…';
-            const doc = await fetchXmlWithTimeout(RSS_FEED_URL, 10000);
-            if (doc.querySelector('item')) return doc;
-        } catch (e) {
-            console.warn('Direct fetch failed:', e.message);
-        }
-
-        for (const proxy of CORS_PROXIES) {
+        for (const strategy of FEED_STRATEGIES) {
             try {
-                const proxyUrl = proxy(RSS_FEED_URL);
-                const proxyHost = proxyUrl.split('://')[1]?.split('/')[0] || 'proxy';
-                document.getElementById('loadingSub').textContent = 'Bandoma: ' + proxyHost;
-                const doc = await fetchXmlWithTimeout(proxyUrl, 12000);
-                if (doc.querySelector('parsererror')) throw new Error('XML parse error');
-                if (doc.querySelector('item')) {
-                    console.log('Success via proxy:', proxyHost);
-                    return doc;
+                document.getElementById('loadingSub').textContent = 'Bandoma: ' + strategy.name + '…';
+                const newPosts = await strategy.run();
+                if (newPosts && newPosts.length) {
+                    console.log('Feed gautas per:', strategy.name);
+                    try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(newPosts)); } catch (e) { /* ignore */ }
+                    return newPosts;
                 }
             } catch (e) {
-                console.warn('Proxy failed:', e.message);
+                console.warn('Feed strategy failed (' + strategy.name + '):', e.message);
             }
         }
+
+        // Visi šaltiniai nepasiekiami – rodom paskutinį išsaugotą feed
+        try {
+            const cached = JSON.parse(localStorage.getItem(FEED_CACHE_KEY) || 'null');
+            if (Array.isArray(cached) && cached.length) {
+                cached.forEach(p => {
+                    p.images = Array.isArray(p.images) ? p.images : [];
+                    p.date = p.date ? new Date(p.date) : null;
+                    if (p.date && isNaN(p.date.getTime())) p.date = null;
+                });
+                console.warn('Naudojamas paskutinis išsaugotas feed (visi šaltiniai nepasiekiami)');
+                return cached;
+            }
+        } catch (e) { /* ignore */ }
+
         return null;
     }
 
@@ -800,15 +889,14 @@
     }
 
     async function init() {
-        const doc = await fetchFeed();
+        let newPosts = await fetchFeed();
 
-        if (!doc) {
+        if (!newPosts) {
             showError();
             return;
         }
 
-        const items = Array.from(doc.querySelectorAll('item'));
-        let newPosts = items.map(parseItem).filter(p => p.title || p.text || p.images.length > 0).slice(0, POST_LIMIT);
+        newPosts = newPosts.slice(0, POST_LIMIT);
 
         // Translate all posts from English to Lithuanian
         document.getElementById('loadingSub').textContent = 'Verčiama į lietuvių kalbą…';
