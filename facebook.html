@@ -217,7 +217,9 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            /* 'safe' keeps overflowing content reachable from the top when the
+               auto-scroll fallback kicks in (plain 'center' would clip it) */
+            justify-content: safe center;
             text-align: center;
             padding: 48px 64px;
         }
@@ -702,6 +704,60 @@
     let scrollAnim = null;
     let postCards = [];
 
+    // ─── Fit long post content into the visible window ───
+    // Posts with long text (e.g. multi-paragraph announcements) would overflow
+    // the card and get clipped. We shrink the font size step by step until the
+    // whole content fits into the window. If it still does not fit at the
+    // minimum size, gentle auto-scrolling remains as a fallback (autoScrollText).
+    const MIN_TEXT_FONT_PX = 15;   // floor for post body text
+    const MIN_TITLE_FONT_PX = 20;  // floor for post title
+
+    function fitCardContent(card) {
+        const body = card.querySelector('.post-body');
+        const textEl = card.querySelector('.post-text');
+        const titleEl = card.querySelector('.post-title');
+        if (!body || !textEl || !textEl.textContent.trim()) return;
+
+        // Reset to CSS defaults so repeated fits (e.g. after resize) start fresh
+        textEl.style.fontSize = '';
+        if (titleEl) titleEl.style.fontSize = '';
+
+        const fits = () => body.scrollHeight <= body.clientHeight + 2;
+        if (fits()) return;
+
+        // Shrink the body text first – the title should stay prominent
+        let size = parseFloat(getComputedStyle(textEl).fontSize);
+        while (!fits() && size > MIN_TEXT_FONT_PX) {
+            size = Math.max(size * 0.92, MIN_TEXT_FONT_PX);
+            textEl.style.fontSize = size.toFixed(2) + 'px';
+        }
+
+        // Still overflowing? Shrink the title too
+        if (titleEl && titleEl.textContent.trim()) {
+            let titleSize = parseFloat(getComputedStyle(titleEl).fontSize);
+            while (!fits() && titleSize > MIN_TITLE_FONT_PX) {
+                titleSize = Math.max(titleSize * 0.92, MIN_TITLE_FONT_PX);
+                titleEl.style.fontSize = titleSize.toFixed(2) + 'px';
+            }
+        }
+    }
+
+    function refitAllCards() {
+        postCards.forEach(fitCardContent);
+    }
+
+    // Re-fit text when the window size changes (rotation / different screen)
+    let refitTimer = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(refitTimer);
+        refitTimer = setTimeout(refitAllCards, 200);
+    });
+
+    // The web font (Lexend) changes text metrics once loaded – re-fit then
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => refitAllCards());
+    }
+
     function buildPostCards() {
         const container = document.getElementById('slideshow');
         container.innerHTML = '';
@@ -735,6 +791,9 @@
             container.appendChild(card);
             postCards.push(card);
         });
+
+        // Shrink the font of long posts so their full text fits into the window
+        refitAllCards();
     }
 
     function buildDots() {
@@ -827,8 +886,10 @@
             }
         }
 
-        const textEl = card.querySelector('.post-text');
-        autoScrollText(textEl);
+        // Fallback for posts that still overflow even at the minimum font
+        // size: gently auto-scroll the card body (.post-body is the element
+        // that has overflow-y: auto) so all content remains visible
+        autoScrollText(card.querySelector('.post-body'));
 
         updateDots();
         document.getElementById('loadingScreen').classList.add('hidden');
