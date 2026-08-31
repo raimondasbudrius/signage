@@ -513,9 +513,95 @@
     const FEED_CACHE_KEY = 'signage-fb-feed-cache';
 
     // ─── Translation (English → Lithuanian) ───
-    // Primary: Google Translate (gtx) endpoint; fallback: MyMemory free API.
+    // Order of operations:
+    //   1) Static dictionary for recurring Facebook/fetchrss boilerplate
+    //      titles – deterministic, grammar-checked, needs no network.
+    //   2) Text already in Lithuanian is kept as-is (this feed is mostly
+    //      Lithuanian and sending it through MT would only risk corruption).
+    //   3) Machine translation: Google Translate (gtx) endpoint first,
+    //      MyMemory free API as fallback.
     // Results are cached so repeated refreshes don't re-translate the same text.
     const translationCache = new Map();
+
+    // ─── Known phrases (exact Lithuanian translations, no network needed) ───
+    const STATIC_PHRASES = [
+        { re: /^this content isn'?t available right now\.?$/i, lt: 'Šis turinys šiuo metu nepasiekiamas' },
+        { re: /^this content isn'?t available\.?$/i, lt: 'Šis turinys nepasiekiamas' },
+        { re: /^photo by (.+)$/i, lt: 'Nuotrauka – $1' },
+        { re: /^photos by (.+)$/i, lt: 'Nuotraukos – $1' },
+        { re: /^video by (.+)$/i, lt: 'Vaizdo įrašas – $1' }
+    ];
+
+    // Lithuanian genitive (kilmininkas) of a page name – needed to turn
+    // fetchrss placeholders like "Post from Molėtų progimnazija" into
+    // "Molėtų progimnazijos įrašas"
+    function toGenitive(name) {
+        const n = name.trim();
+        if (!n) return null;
+        const last = n.slice(-1);
+        const lower = last.toLowerCase();
+        const isUpper = last !== lower;
+        const suf = s => (isUpper ? s.toUpperCase() : s);
+
+        // Masculine nouns ending in -as / -is / -ys / -us
+        if (lower === 's') {
+            const prev = n.slice(-2, -1).toLowerCase();
+            if (prev === 'a') return n.slice(0, -2) + suf('o');
+            if (prev === 'i') return n.slice(0, -2) + suf('io');
+            if (prev === 'y') return n.slice(0, -2) + suf('io');
+            if (prev === 'u') return n.slice(0, -2) + suf('aus');
+            return n + suf('o');
+        }
+        if ('aą'.includes(lower)) return n.slice(0, -1) + suf('os');
+        if ('eęė'.includes(lower)) return n.slice(0, -1) + suf('ės');
+        if ('iį'.includes(lower)) return n.slice(0, -1) + suf('ės');
+        if (lower === 'y') return n.slice(0, -1) + suf('io');
+        if ('uų'.includes(lower)) return n.slice(0, -1) + suf('aus');
+        if (lower === 'o') return n;
+        return null;
+    }
+
+    function staticTranslation(text) {
+        const t = text.trim();
+
+        // "A post from <Page>" / "Post from <Page>" – fetchrss placeholder title
+        const postFrom = t.match(/^(?:a\s+)?post from\s+(.+)$/i);
+        if (postFrom) {
+            const gen = toGenitive(postFrom[1]);
+            return gen ? gen + ' įrašas' : 'Įrašas';
+        }
+
+        for (const entry of STATIC_PHRASES) {
+            if (entry.re.test(t)) return t.replace(entry.re, entry.lt);
+        }
+        return null;
+    }
+
+    // Heuristic: does this text look Lithuanian? Lithuanian diacritics
+    // (ą č ę ė į š ų ū ž) almost never appear in other languages
+    const LT_WORDS = new Set([
+        'ir', 'bet', 'kad', 'iš', 'su', 'bei', 'ar', 'į', 'nuo', 'po', 'per',
+        'iki', 'bus', 'kaip', 'tai', 'tik', 'dar', 'jau', 'labai', 'dėl',
+        'apie', 'kuris', 'kuri', 'mes', 'jūs', 'jų', 'mūsų', 'kl', 'mok', 'val'
+    ]);
+
+    function isLithuanian(text) {
+        const sample = text.slice(0, 600);
+        const diacritics = (sample.match(/[ąčęėįšųūžĄČĘĖĮŠŲŪŽ]/g) || []).length;
+        if (diacritics >= 2) return true;
+        const words = sample.toLowerCase().split(/[^a-ząčęėįšųūž]+/).filter(Boolean);
+        if (!words.length) return false;
+        const ltWords = words.filter(w => LT_WORDS.has(w)).length;
+        return ltWords / words.length >= 0.1;
+    }
+
+    // Short codes and schedule lines (e.g. "8a kl. mok. 8 - 10 val.") should
+    // not go through MT – only translate text that looks like real sentences
+    function looksTranslatable(text) {
+        const words = text.split(/\s+/).filter(Boolean);
+        const longWords = words.filter(w => w.replace(/[^a-ząčęėįšųūž]/gi, '').length >= 4).length;
+        return longWords >= 2;
+    }
 
     function fetchWithTimeout(url, ms, options) {
         const ctrl = new AbortController();
@@ -526,7 +612,7 @@
 
     async function translateViaGoogle(text) {
         const res = await fetchWithTimeout(
-            'https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=lt&dt=t',
+            'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=lt&dt=t',
             8000,
             {
                 method: 'POST',
@@ -539,7 +625,7 @@
         const out = (Array.isArray(data) && Array.isArray(data[0]) ? data[0] : [])
             .map(seg => (seg && typeof seg[0] === 'string') ? seg[0] : '')
             .join('');
-        if (!out) throw new Error('empty translation');
+        if (!out || /<\s*(html|body|head)/i.test(out)) throw new Error('bad response');
         return out;
     }
 
@@ -558,6 +644,20 @@
         if (!text || text.trim().length === 0) return text;
         if (translationCache.has(text)) return translationCache.get(text);
 
+        // 1) Known boilerplate phrases – translated locally, no network needed
+        const known = staticTranslation(text);
+        if (known) {
+            translationCache.set(text, known);
+            return known;
+        }
+
+        // 2) Text already in Lithuanian (or schedule-like codes) – leave as-is
+        if (isLithuanian(text) || !looksTranslatable(text)) {
+            translationCache.set(text, text);
+            return text;
+        }
+
+        // 3) Machine translation: Google first, MyMemory as fallback
         try {
             const translated = await translateViaGoogle(text);
             translationCache.set(text, translated);
@@ -584,7 +684,6 @@
                 const newPosts = await strategy.run();
                 if (newPosts && newPosts.length) {
                     console.log('Feed gautas per:', strategy.name);
-                    try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(newPosts)); } catch (e) { /* ignore */ }
                     return newPosts;
                 }
             } catch (e) {
@@ -593,20 +692,39 @@
         }
 
         // Visi šaltiniai nepasiekiami – rodom paskutinį išsaugotą feed
-        try {
-            const cached = JSON.parse(localStorage.getItem(FEED_CACHE_KEY) || 'null');
-            if (Array.isArray(cached) && cached.length) {
-                cached.forEach(p => {
-                    p.images = Array.isArray(p.images) ? p.images : [];
-                    p.date = p.date ? new Date(p.date) : null;
-                    if (p.date && isNaN(p.date.getTime())) p.date = null;
-                });
-                console.warn('Naudojamas paskutinis išsaugotas feed (visi šaltiniai nepasiekiami)');
-                return cached;
-            }
-        } catch (e) { /* ignore */ }
+        const cached = readLocalFeedCache();
+        if (cached) {
+            console.warn('Naudojamas paskutinis išsaugotas feed (visi šaltiniai nepasiekiami)');
+            return cached;
+        }
 
         return null;
+    }
+
+    // Read the last successfully fetched feed from localStorage (dates are
+    // revived as Date objects so the rest of the code can use them directly)
+    function readLocalFeedCache() {
+        try {
+            const cached = JSON.parse(localStorage.getItem(FEED_CACHE_KEY) || 'null');
+            if (!Array.isArray(cached) || !cached.length) return null;
+            cached.forEach(p => {
+                p.images = Array.isArray(p.images) ? p.images : [];
+                p.date = p.date ? new Date(p.date) : null;
+                if (p.date && isNaN(p.date.getTime())) p.date = null;
+            });
+            return cached;
+        } catch (e) { return null; }
+    }
+
+    // Warm the browser image cache in the background so post images appear
+    // instantly when the signage player switches to this source
+    function warmImageCache(postList) {
+        (postList || []).forEach(p => {
+            (p.images || []).forEach(url => {
+                const img = new Image();
+                img.src = url;
+            });
+        });
     }
 
     // ─── Parse RSS items ───
@@ -688,10 +806,18 @@
 
     // ─── Translate post content ───
     async function translatePost(post) {
-        const [title, text] = await Promise.all([
-            translateText(post.title),
-            translateText(post.text)
-        ]);
+        const title = await translateText(post.title);
+
+        // Translate line by line so Lithuanian content stays untouched and
+        // only foreign (usually English boilerplate) lines get translated
+        let text = post.text;
+        if (text && text.trim()) {
+            const lines = text.split('\n');
+            text = (await Promise.all(
+                lines.map(line => (line.trim() ? translateText(line) : line))
+            )).join('\n');
+        }
+
         return { ...post, title, text };
     }
 
@@ -950,6 +1076,19 @@
     }
 
     async function init() {
+        // First load: if a previous feed is saved, show it instantly (viewers
+        // never see the loading screen) while the fresh feed is fetched in the
+        // background – the new content swaps in seamlessly when ready.
+        if (posts.length === 0 && currentPost === -1) {
+            const cached = readLocalFeedCache();
+            if (cached) {
+                posts = cached.slice(0, POST_LIMIT);
+                warmImageCache(posts);
+                console.log('Rodomas išsaugotas feed, kol naujas kraunamas fone');
+                startSlideshow();
+            }
+        }
+
         let newPosts = await fetchFeed();
 
         if (!newPosts) {
@@ -967,6 +1106,11 @@
             showError();
             return;
         }
+
+        // Save the translated feed so future (re)loads can show it instantly,
+        // and pre-cache the post images in the background as well
+        try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(newPosts)); } catch (e) { /* ignore */ }
+        warmImageCache(newPosts);
 
         // First load – start slideshow
         if (currentPost === -1 || posts.length === 0) {
@@ -989,6 +1133,27 @@
         posts = newPosts;
         await swapSlideshow();
     }
+
+    // ─── Signage integration ───
+    // The signage player (index.html) keeps this page loaded in the background
+    // and, when it is Facebook's turn, asks us to restart the slideshow from
+    // post #1 instead of reloading the iframe. The posts are already fetched,
+    // translated and image-cached at that point, so the switch is instant and
+    // viewers never see the loading screen.
+    window.addEventListener('message', (e) => {
+        const msg = e && e.data;
+        if (!msg || msg.type !== 'signage-restart') return;
+        if (!posts.length) return; // not ready yet – the first render starts at #1 anyway
+
+        clearInterval(postTimer);
+        clearInterval(imageTimer);
+        currentImage = 0;
+        currentPost = 0;
+        renderPost(0);
+        clearTimeout(postTimer);
+        postTimer = setInterval(advancePost, POST_DELAY);
+        console.log('Signage: slideshow restarted from post #1');
+    });
 
     init();
 

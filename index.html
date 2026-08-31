@@ -280,6 +280,18 @@
     setInterval(updateClock, 1000);
     updateClock();
 
+    // Assigning iframe.src always forces a full reload – even when the URL is
+    // identical. loadConfig() runs every 5 minutes, so blindly re-setting the
+    // same URL would tear down warmed-up pages (e.g. the Facebook iframe with
+    // its pre-fetched, translated posts) over and over. Only navigate when the
+    // URL really changed.
+    function setIframeSrcIfChanged(iframeId, src) {
+        const iframe = document.getElementById(iframeId);
+        if (!iframe) return;
+        if (iframe.getAttribute('src') === src) return;
+        iframe.src = src;
+    }
+
     // ─── Load Config from localStorage ───
     function loadConfig() {
         try {
@@ -321,11 +333,15 @@
             facebookUrl = fbSlideshowUrl;
 
             // Tvarkarastis gets ?embed=1 (same convention as facebook.html) and
-            // the signage embed CSS is injected into its iframe document
+            // the signage embed CSS is injected into its iframe document.
+            // Note: slides src is always re-assigned (they are refreshed on
+            // purpose); tvarkarastis/facebook are only re-navigated when their
+            // URL really changed, so their warmed-up state survives reloads
+            // of the config (which happens every 5 minutes).
             const tvSeparator = tvUrl.includes('?') ? '&' : '?';
-            document.getElementById('iframe-tvarkarastis').src = tvUrl + tvSeparator + 'embed=1';
+            setIframeSrcIfChanged('iframe-tvarkarastis', tvUrl + tvSeparator + 'embed=1');
             document.getElementById('iframe-slides').src = slidesUrl;
-            document.getElementById('iframe-facebook').src = fbSlideshowUrl;
+            setIframeSrcIfChanged('iframe-facebook', fbSlideshowUrl);
 
             applyTvarkarastisEmbedStyle();
 
@@ -434,7 +450,8 @@
             refreshSlides();
         }
 
-        // Reload Facebook fresh so the slideshow always starts from post #1
+        // Restart the warm Facebook slideshow from post #1 (no reload, so the
+        // pre-fetched posts are visible instantly)
         if (entry.source_type === 'facebook') {
             refreshFacebook();
         }
@@ -496,20 +513,32 @@
     // Refresh slides every 5 minutes in the background
     setInterval(refreshSlides, 5 * 60 * 1000);
 
-    // ─── Facebook Fresh Reload ───
-    // Recreate the Facebook iframe so the slideshow restarts from post #1
+    // ─── Facebook Fresh Restart ───
+    // The Facebook iframe is loaded once on startup and then kept "warm":
+    // while other sources are on screen it fetches the feed, translates the
+    // posts and caches the images in the background. When it is Facebook's
+    // turn we only tell the already-loaded page to restart its slideshow from
+    // post #1 (postMessage) – no reload, so viewers never see a loading
+    // screen. The iframe is recreated only as a fallback if it went missing.
     function refreshFacebook() {
+        const iframe = document.getElementById('iframe-facebook');
+
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ type: 'signage-restart' }, '*');
+            console.log('🔄 Facebook restarted from post #1 (warm iframe, no reload)');
+            return;
+        }
+
         const container = document.getElementById('src-facebook');
         if (!container || !facebookUrl) return;
 
-        const oldIframe = document.getElementById('iframe-facebook');
-        if (oldIframe) oldIframe.remove();
+        if (iframe) iframe.remove();
 
-        const iframe = document.createElement('iframe');
-        iframe.id = 'iframe-facebook';
+        const newIframe = document.createElement('iframe');
+        newIframe.id = 'iframe-facebook';
         const separator = facebookUrl.includes('?') ? '&' : '?';
-        iframe.src = facebookUrl + separator + '_t=' + Date.now();
-        container.appendChild(iframe);
+        newIframe.src = facebookUrl + separator + '_t=' + Date.now();
+        container.appendChild(newIframe);
         console.log('🔄 Facebook reloaded (starts at post #1)');
     }
 
