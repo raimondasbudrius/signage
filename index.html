@@ -655,10 +655,10 @@
         }
 
         .lesson-info { line-height: 1.22 !important; }
-        .lesson-info > div:first-child { font-size: clamp(12px, 2vh, 22px) !important; }
+        .lesson-info > div:first-child { font-size: clamp(13px, 2.2vh, 24px) !important; }
         .lesson-info > div:last-child  { font-size: clamp(10px, 1.8vh, 20px) !important; }
 
-        .lesson-class { font-size: clamp(12px, 2vh, 22px) !important; }
+        .lesson-class { font-size: clamp(13px, 2.2vh, 24px) !important; }
         .room-badge, .split-badge { font-size: clamp(9px, 1.4vh, 15px) !important; }
         .break-indicator { font-size: clamp(11px, 1.9vh, 20px) !important; }
         .break-indicator span { font-size: clamp(9px, 1.5vh, 16px) !important; }
@@ -712,6 +712,123 @@
         return el ? el.getBoundingClientRect().height : 0;
     }
 
+    // Make the SUBJECT text of every lesson cell as large as the cell allows,
+    // so it is readable from far away. The teacher/room line keeps its small
+    // size. Cells with a single lesson get the biggest subject (the whole
+    // cell height is available); multi-lesson cells share the height between
+    // their subject lines. All measurements are in layout px (offsetWidth /
+    // clientWidth are transform-independent), so the enlarged fonts shrink
+    // correctly together with the table's scale().
+    function enhanceLessonFonts() {
+        var table = document.getElementById('timelineTable');
+        if (!table) return;
+
+        var s = 1;
+        var m = /scale\(([\d.]+)\)/.exec(table.style.transform || '');
+        if (m) s = parseFloat(m[1]) || 1;
+        var maxScreenPx = 120; // never exceed this on-screen font size
+
+        var cells = table.querySelectorAll('td.lesson-cell');
+        for (var i = 0; i < cells.length; i++) {
+            var cell = cells[i];
+            var groups = cell.querySelectorAll('.lesson-info');
+            if (!groups.length) continue;
+
+            var cs = getComputedStyle(cell);
+            var availW = cell.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+            var availH = cell.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+            if (availW <= 20 || availH <= 10) continue;
+
+            // Height used by the small teacher/room lines (kept as-is)
+            var fixedH = 0;
+            var g;
+            for (g = 0; g < groups.length; g++) {
+                var tDiv = groups[g].children[1];
+                fixedH += tDiv ? tDiv.offsetHeight : 0;
+            }
+            var perGroupH = Math.max(0, availH - fixedH) / groups.length;
+
+            for (g = 0; g < groups.length; g++) {
+                var sDiv = groups[g].children[0];
+                if (!sDiv) continue;
+                var span = sDiv.querySelector('.lesson-class') || sDiv;
+
+                var f0 = parseFloat(getComputedStyle(span).fontSize);
+                if (!f0 || f0 <= 0) continue;
+
+                var w = span.offsetWidth;
+                if (!w) {
+                    var r = span.getBoundingClientRect();
+                    w = r.width / s;
+                }
+                var h = sDiv.offsetHeight || f0 * 1.25;
+                if (!w || !h) continue;
+
+                var factor = Math.min(availW / w, perGroupH / h) * 0.98; // 2% safety margin
+                if (factor <= 1.05) continue; // already fills the cell
+
+                var f = Math.min(f0 * factor, f0 * 14, 320, maxScreenPx / s);
+                if (f <= f0 * 1.05) continue;
+
+                // !important overrides the embedded stylesheet clamp() rules
+                span.style.setProperty('font-size', f.toFixed(1) + 'px', 'important');
+            }
+        }
+    }
+
+    // Distribute the vertical slack ("water filling"): after the scale is
+    // fixed, rows are raised towards a common level as far as the budget
+    // allows, so sparse rows become tall too and every cell can carry a
+    // large, far-readable subject font. Rows never go below their natural
+    // (content) height, so nothing is clipped; the fit loop already
+    // guarantees that the natural content fits at this scale.
+    function stretchRows(table, availH, s) {
+        var rows = table.querySelectorAll('tbody tr');
+        var target = Math.floor(availH / s);
+        if (!rows.length) {
+            table.style.height = target + 'px';
+            return;
+        }
+        table.style.height = 'auto';
+        var theadRow = table.querySelector('thead tr');
+        var theadH = theadRow ? theadRow.offsetHeight : 0;
+        var heights = [];
+        var natSum = 0;
+        for (var i = 0; i < rows.length; i++) {
+            heights[i] = rows[i].offsetHeight;
+            natSum += heights[i];
+        }
+        var budget = target - theadH;
+        var rem = budget - natSum;
+        // Raise the shortest rows towards the next level while slack remains
+        var guard = 0;
+        while (rem > 0.5 && guard++ < 64) {
+            var min = Infinity;
+            for (i = 0; i < heights.length; i++) {
+                if (heights[i] < min) min = heights[i];
+            }
+            var next = Infinity;
+            for (i = 0; i < heights.length; i++) {
+                if (heights[i] > min + 0.001 && heights[i] < next) next = heights[i];
+            }
+            var cnt = 0;
+            for (i = 0; i < heights.length; i++) {
+                if (heights[i] <= min + 0.001) cnt++;
+            }
+            var raise = Math.min(next === Infinity ? rem / cnt : next - min, rem / cnt);
+            if (raise <= 0) break;
+            for (i = 0; i < heights.length; i++) {
+                if (heights[i] <= min + 0.001) heights[i] += raise;
+            }
+            rem -= raise * cnt;
+            if (next === Infinity) break;
+        }
+        for (i = 0; i < rows.length; i++) {
+            rows[i].style.height = Math.floor(heights[i]) + 'px';
+        }
+        table.style.height = target + 'px';
+    }
+
     function fitTable(reason) {
         var table = document.getElementById('timelineTable');
         var container = document.querySelector('.timeline-container');
@@ -726,6 +843,19 @@
         if (availW <= 0 || availH <= 0) {
             log(reason + ': skip (container ' + availW + 'x' + availH + ')');
             return;
+        }
+
+        // Reset any previous subject-font enlargement so the measured natural
+        // content size (and therefore the scale) stays stable/deterministic;
+        // the fonts are re-enlarged below for the FINAL stretched cell sizes.
+        var enlarged = table.querySelectorAll('.lesson-class');
+        for (var j = 0; j < enlarged.length; j++) {
+            enlarged[j].style.removeProperty('font-size');
+        }
+        // ...same for row heights set by stretchRows() in the previous cycle
+        var oldRows = table.querySelectorAll('tbody tr');
+        for (var k = 0; k < oldRows.length; k++) {
+            oldRows[k].style.removeProperty('height');
         }
 
         // Iteratively find the largest scale (max 1) at which the WHOLE table
@@ -750,8 +880,9 @@
             s = sNew;
         }
         table.style.width = Math.max(1, Math.floor(availW / s)) + 'px';
-        table.style.height = Math.floor(availH / s) + 'px'; // stretch rows to fill screen
         table.style.transform = 'scale(' + s.toFixed(4) + ')';
+        stretchRows(table, availH, s); // sets table height + equal row slack
+        enhanceLessonFonts();
         log(reason + ': avail=' + availW + 'x' + availH + ' scale=' + s.toFixed(4));
     }
 
