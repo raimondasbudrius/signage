@@ -586,6 +586,7 @@
             width: 100%;
             min-width: 0 !important;
             font-size: clamp(11px, 1.7vh, 18px) !important;
+            transform-origin: 0 0;
         }
 
         .timeline-table th { padding: clamp(4px, 0.8vh, 10px) 4px !important; }
@@ -617,8 +618,9 @@
         .no-lesson { font-size: clamp(10px, 1.7vh, 18px) !important; }
     `;
 
-    // Auto-fit: scales the table (CSS zoom) so the WHOLE timetable is always
-    // visible on screen, no matter how many lessons each class has that day.
+    // Auto-fit: scales the table (CSS transform scale) so the WHOLE timetable
+    // (every class row AND all 8 period columns) is always visible on screen,
+    // no matter how many lessons each class has that day.
     // Re-runs whenever tvarkarastis re-renders (its own 1-min / 10-min timers).
     const TVARKARASTIS_EMBED_JS = `
 (function () {
@@ -679,30 +681,31 @@
             return;
         }
 
-        // Iteratively find the largest zoom (max 1) at which the table content
-        // fits the available height (wider table = fewer wrapped lines).
-        // NOTE: measure the TABLE element itself — thead/tbody rects are
-        // unreliable (Chrome returns empty rects for table sections).
+        // Iteratively find the largest scale (max 1) at which the WHOLE table
+        // fits both the available width AND height (wider table = fewer wrapped
+        // lines = shorter table). Uses transform:scale() instead of CSS zoom:
+        // offsetWidth/offsetHeight are transform-independent, so the math is
+        // deterministic and the right-hand period columns never get clipped.
         var s = 1;
-        for (var i = 0; i < 4; i++) {
-            // Reset inline sizing so we measure the natural content height
-            // (CSS height:100% keeps the table at least as tall as the screen)
-            table.style.zoom = '';
-            table.style.height = '';
-            table.style.width = (100 / s) + '%';
-            var contentH = rectH(table);
-            if (contentH <= 0) {
-                log(reason + ': skip (contentH=0)');
+        for (var i = 0; i < 6; i++) {
+            // Reset inline sizing so we measure the natural content size
+            table.style.transform = 'none';
+            table.style.height = 'auto';
+            table.style.width = Math.max(1, Math.floor(availW / s)) + 'px';
+            var contentW = table.offsetWidth;
+            var contentH = table.offsetHeight;
+            if (contentW <= 0 || contentH <= 0) {
+                log(reason + ': skip (content ' + contentW + 'x' + contentH + ')');
                 return;
             }
-            var sNew = Math.min(1, availH / contentH);
-            if (Math.abs(sNew - s) < 0.01) { s = sNew; break; }
+            var sNew = Math.min(1, availH / contentH, availW / contentW);
+            if (Math.abs(sNew - s) < 0.005) { s = sNew; break; }
             s = sNew;
         }
-        table.style.zoom = s.toFixed(4);
-        table.style.width = (100 / s) + '%';
-        table.style.height = (availH / s) + 'px';
-        log(reason + ': avail=' + availW + 'x' + availH + ' zoom=' + s.toFixed(4));
+        table.style.width = Math.max(1, Math.floor(availW / s)) + 'px';
+        table.style.height = Math.floor(availH / s) + 'px'; // stretch rows to fill screen
+        table.style.transform = 'scale(' + s.toFixed(4) + ')';
+        log(reason + ': avail=' + availW + 'x' + availH + ' scale=' + s.toFixed(4));
     }
 
     function watch() {
