@@ -434,14 +434,15 @@
         document.getElementById('sourceDots').style.display = '';
     }
 
-    // ─── Advance to Next Source ───
-    function advanceSource() {
-        if (activeSources.length === 0) {
+    // ─── Show Source ───
+    function showSourceAt(index) {
+        if (!activeSources || activeSources.length === 0) {
             showIdle();
             return;
         }
 
-        currentSourceIndex = (currentSourceIndex + 1) % activeSources.length;
+        const n = activeSources.length;
+        currentSourceIndex = ((index % n) + n) % n;
         const entry = activeSources[currentSourceIndex];
 
         // Always refresh Google Slides right before showing it,
@@ -478,6 +479,51 @@
         sourceTimer = setTimeout(() => {
             advanceSource();
         }, progressDuration);
+    }
+
+    // ─── Advance to Next / Previous Source ───
+    function advanceSource() {
+        showSourceAt(currentSourceIndex + 1);
+    }
+
+    function goBackSource() {
+        showSourceAt(currentSourceIndex - 1);
+    }
+
+    // ─── Manual Keyboard Navigation ───
+    // Left/right arrow keys switch sources instantly, bypassing the
+    // remaining wait time: → next source, ← previous source.
+    function handleManualNav(key) {
+        if (!activeSources || activeSources.length === 0) return;
+        if (key === 'ArrowRight') {
+            advanceSource();
+        } else if (key === 'ArrowLeft') {
+            goBackSource();
+        }
+    }
+
+    window.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            handleManualNav(e.key);
+        }
+    });
+
+    // Also listen inside same-origin iframes so the keys keep working even
+    // when an iframe holds the focus (cross-origin iframes such as Google
+    // Slides are not accessible – there the keys work while the top page
+    // has focus).
+    function attachKeyNavToIframe(iframe) {
+        try {
+            const win = iframe.contentWindow;
+            if (!win) return;
+            win.addEventListener('keydown', function (e) {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    handleManualNav(e.key);
+                }
+            });
+        } catch (err) { /* cross-origin iframe – ignore */ }
     }
 
     function updateProgress() {
@@ -539,6 +585,7 @@
         const separator = facebookUrl.includes('?') ? '&' : '?';
         newIframe.src = facebookUrl + separator + '_t=' + Date.now();
         container.appendChild(newIframe);
+        attachKeyNavToIframe(newIframe);
         console.log('🔄 Facebook reloaded (starts at post #1)');
     }
 
@@ -764,7 +811,13 @@
     }
 
     // Re-apply the embed style every time the tvarkarastis iframe (re)loads
-    document.getElementById('iframe-tvarkarastis').addEventListener('load', applyTvarkarastisEmbedStyle);
+    document.getElementById('iframe-tvarkarastis').addEventListener('load', function () {
+        applyTvarkarastisEmbedStyle();
+        attachKeyNavToIframe(document.getElementById('iframe-tvarkarastis'));
+    });
+    document.getElementById('iframe-facebook').addEventListener('load', function () {
+        attachKeyNavToIframe(document.getElementById('iframe-facebook'));
+    });
 
     // Listen for localStorage changes (from admin page)
     window.addEventListener('storage', function(e) {
